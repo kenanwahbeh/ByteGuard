@@ -6,17 +6,28 @@
 
 # ByteGuard
 
+[العربية](README.ar.md)
+
 ByteGuard sets up a WireGuard VPN server on your own machine with one
 command, lets you manage its devices from a web page, and brings the whole
 setup back from a single backup file after a server reinstall.
 
-> **Status:** version 2 is in development and has no release yet. The VPN
-> server, device management, backups, the web interface and its Cloudflare
-> Tunnel work.
-> The previous single-file script is still available as release
-> [v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0).
+## Install
 
-## What works today
+On a fresh Ubuntu 22.04+ or Debian 12+ server:
+
+```bash
+curl -fsSL https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh -o byteguard.sh
+sudo bash byteguard.sh
+```
+
+Every release also carries `byteguard.sh.sha256`, and the program is
+embedded in the installer as plain text, so you can read it before running
+it. Version 1, the old single-file script, stays available as release
+[v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0);
+version 2 does not import its data.
+
+## What it does
 
 - One installer file for Ubuntu 22.04+ and Debian 12+. The program is
   embedded in it as plain text, so you can read everything it installs.
@@ -49,14 +60,7 @@ setup back from a single backup file after a server reinstall.
 Everything runs on your server and your own accounts. ByteGuard has no
 hosted service and collects no data.
 
-## Trying the development build
-
-```bash
-git clone https://github.com/kenanwahbeh/ByteGuard.git
-cd ByteGuard
-python3 tools/build.py
-sudo bash dist/byteguard.sh
-```
+## Setup
 
 The installer asks its questions, starts the VPN and prints the first
 device's configuration and QR code. To skip the questions, pass
@@ -161,14 +165,29 @@ device then needs its configuration again.
 key, the Telegram bot token and the storage keys. Anyone who gets the file can connect to
 your VPN, so keep it, and the chat it is sent to, private.
 
+## Security
+
+See [SECURITY.md](SECURITY.md) for what ByteGuard stores, what it exposes
+and how to report a vulnerability privately.
+
 ## Development
 
-The program is Python 3.10+ and uses only the standard library.
+The program is Python 3.10+ and uses only the standard library. To build
+the installer from source:
+
+```bash
+git clone https://github.com/kenanwahbeh/ByteGuard.git
+cd ByteGuard
+python3 tools/build.py                  # writes dist/byteguard.sh
+sudo bash dist/byteguard.sh
+```
 
 ```bash
 python3 -m unittest discover -s tests   # unit tests, safe to run anywhere
-python3 tools/build.py                  # builds dist/byteguard.sh
 ```
+
+Pushing a tag such as `v2.0.1` that matches `byteguard/__init__.py` runs the
+tests, builds the installer and publishes it as a GitHub release.
 
 `tests/e2e/run.sh` installs for real, connects a client and uninstalls. It
 changes the firewall of the machine it runs on, so it is meant for CI
