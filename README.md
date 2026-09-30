@@ -4,38 +4,43 @@
 
 # **Byte Balance Technology**
 
-# Wireguard_UI
+# ByteGuard
 
-A self-contained, single-file WireGuard installer and manager. No external
-database or config files — every server key and client (device) is stored
-inside the script itself, so copying the one `.sh` file is enough to
-reinstall or restore a full setup on a new machine.
+ByteGuard sets up a WireGuard VPN server on your own machine with one
+command, lets you manage its devices from a web page, and brings the whole
+setup back from a single backup file after a server reinstall.
 
-## Features
+> **Status:** version 2 is being rebuilt from scratch and cannot be
+> installed yet. The previous single-file script is still available as
+> release [v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0).
 
-- Interactive setup: installs WireGuard, auto-detects available network
-  interfaces, and lets you pick which one faces the internet.
-- Self-contained state: server keys and the full device list live inside
-  the script (between `WG_STATE` markers) and are rewritten in place on
-  every change — no `params` or `clients.db` files.
-- Simple device management menu: add, remove, and list devices.
-- View any device's config as plain text and as a QR code, picked from a
-  numbered list.
-- Tuned defaults: `PersistentKeepalive = 25`, `MTU = 1420` (better for
-  slow/unstable links), VPN subnet `10.66.66.0/24`, port `22`.
+## What version 2 is being built to do
 
-## Usage
+- Install from one `.sh` file on Ubuntu 22.04+ and Debian 12+.
+- Guided setup: it finds the network card that faces the internet and the
+  server's public address, confirms both with you, and asks for the port.
+- Route all of each device's traffic through the server, with
+  `PersistentKeepalive = 25` and `MTU = 1420`.
+- A web interface in Arabic and English: add and remove devices, show their
+  QR codes, see which ones are connected, and switch a device off without
+  deleting it.
+- The web interface is never put on an open port. It is reached through a
+  Cloudflare Tunnel on your own domain, or only from inside the VPN.
+- A backup after every change, which you can download or have sent to a
+  Telegram bot or to S3-compatible storage such as Cloudflare R2. A backup
+  is one runnable file that restores everything on a fresh server. It is
+  not encrypted, so it has to be kept somewhere private.
+- Everything runs on your server and your own accounts. ByteGuard has no
+  hosted service and collects no data.
+
+## Development
+
+The program is Python 3.10+ and uses only the standard library.
 
 ```bash
-sudo bash wireguard-install.sh
+python3 -m unittest discover -s tests
+python3 -m byteguard --version
 ```
-
-Follow the prompts on first run to install the server. Every run after
-that opens a management menu to add/remove devices or view their config.
-
-> **Warning:** once installed, this file contains your server's and
-> devices' private keys. Keep it root-only (the script sets `chmod 700`
-> on itself automatically) and never share it publicly.
 
 ## Sponsor
 
@@ -50,3 +55,7 @@ the nickname **Kinan125**.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+WireGuard is a registered trademark of Jason A. Donenfeld. ByteGuard is an
+independent project and is not affiliated with or endorsed by the WireGuard
+project.
