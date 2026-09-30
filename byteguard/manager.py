@@ -1,12 +1,13 @@
 """Everything ByteGuard can do to the server. The terminal and the web interface both call this."""
 
 import contextlib
+import copy
 import datetime
 import ipaddress
 import shutil
 import tempfile
 
-from byteguard import firewall, state, system, wg
+from byteguard import backup, firewall, state, system, telegram, wg
 from byteguard.errors import ByteGuardError
 from byteguard.paths import INTERFACE, Paths
 
@@ -19,9 +20,39 @@ SERVICE = f"wg-quick@{INTERFACE}"
 
 
 class Manager:
-    def __init__(self, paths: Paths | None = None, run=system.run):
+    def __init__(self, paths: Paths | None = None, run=system.run, send=telegram.send_document):
         self.paths = paths or Paths()
         self.run = run
+        self.send = send
+        # What the backup after the latest change did, per destination.
+        self.last_backup: dict = {}
+
+    def _save(self, data: dict) -> None:
+        """Save the state, then back it up. A failed backup never undoes the change."""
+        state.save(self.paths.state, data)
+        try:
+            self.last_backup = backup.run(self.paths, data, self.send)
+        except (OSError, ValueError) as error:
+            self.last_backup = {"local": {"ok": False, "error": str(error)}}
+
+    def back_up(self) -> dict:
+        with state.locked(self.paths.lock):
+            self._save(self._state())
+        return self.last_backup
+
+    def telegram_chat(self) -> dict | None:
+        return self._state().get("backup", {}).get("telegram")
+
+    def set_telegram(self, token: str | None, chat_id: int | None = None) -> None:
+        """Send every backup to this Telegram chat, or stop with token None."""
+        with state.locked(self.paths.lock):
+            data = self._state()
+            destinations = data.setdefault("backup", {})
+            if token is None:
+                destinations.pop("telegram", None)
+            else:
+                destinations["telegram"] = {"token": token, "chat_id": chat_id}
+            self._save(data)
 
     # Reading
 
@@ -98,16 +129,32 @@ class Manager:
                 "firewall": {"mode": firewall.detect(self.run)},
                 "devices": [],
             }
-            try:
-                firewall.enable_forwarding(self.paths.sysctl, self.run)
-                firewall.open_ports(self.run, data["firewall"]["mode"], iface, port)
-                state.write_private(self.paths.wg_conf, wg.server_config(data))
-                self.run(["systemctl", "enable", "--now", SERVICE])
-            except BaseException:
-                # Leave the server as it was found, so setup can simply be run again.
-                self._tear_down(data)
-                raise
-            state.save(self.paths.state, data)
+            self._bring_up(data)
+
+    def restore(self, saved: dict, *, iface: str, endpoint: str | None = None) -> None:
+        """Set this server up from a backup's state: same keys, same devices."""
+        with state.locked(self.paths.lock):
+            self.check_can_set_up()
+            data = copy.deepcopy(saved)
+            data["server"]["iface"] = iface
+            if endpoint:
+                data["server"]["endpoint"] = endpoint
+            # The new server may not have the firewall the old one had.
+            data["firewall"] = {"mode": firewall.detect(self.run)}
+            self._bring_up(data)
+
+    def _bring_up(self, data: dict) -> None:
+        server = data["server"]
+        try:
+            firewall.enable_forwarding(self.paths.sysctl, self.run)
+            firewall.open_ports(self.run, data["firewall"]["mode"], server["iface"], server["port"])
+            state.write_private(self.paths.wg_conf, wg.server_config(data))
+            self.run(["systemctl", "enable", "--now", SERVICE])
+        except BaseException:
+            # Leave the server as it was found, so this can simply be run again.
+            self._tear_down(data)
+            raise
+        self._save(data)
 
     def uninstall(self) -> None:
         """Remove the VPN, its firewall rules, its keys and the program itself."""
@@ -154,8 +201,8 @@ class Manager:
         server["port"] = new
         firewall.open_ports(self.run, mode, server["iface"], new)
         state.write_private(self.paths.wg_conf, wg.server_config(data))
-        state.save(self.paths.state, data)
         self.run(["systemctl", "start", SERVICE])
+        self._save(data)
 
     # Devices
 
@@ -195,7 +242,7 @@ class Manager:
         with state.locked(self.paths.lock):
             data = self._state()
             yield data
-            state.save(self.paths.state, data)
+            self._save(data)
             state.write_private(self.paths.wg_conf, wg.server_config(data))
             self._sync()
 

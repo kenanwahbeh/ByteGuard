@@ -13,6 +13,7 @@ class Paths:
     sysctl: Path = Path("/etc/sysctl.d/99-byteguard.conf")
     program: Path = Path("/opt/byteguard")
     launcher: Path = Path("/usr/local/bin/byteguard")
+    backups: Path = Path("/var/backups/byteguard")
 
     @property
     def state(self) -> Path:
@@ -21,6 +22,10 @@ class Paths:
     @property
     def lock(self) -> Path:
         return self.etc / "state.lock"
+
+    @property
+    def backup_status(self) -> Path:
+        return self.etc / "backup-status.json"
 
     @property
     def wg_conf(self) -> Path:

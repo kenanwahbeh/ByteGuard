@@ -23,6 +23,8 @@ die() {
 
 # @@BYTEGUARD_PAYLOAD@@
 
+# @@BYTEGUARD_DATA@@
+
 check_system() {
   [[ $EUID -eq 0 ]] || die "Run this as root, for example: sudo bash $0"
   declare -F extract_payload >/dev/null ||
@@ -73,6 +75,18 @@ EOF
   chmod 755 "$LAUNCHER"
 }
 
+# This file is a backup when it carries restore_data: bring that setup back.
+restore_backup() {
+  [[ ! -f $STATE_FILE ]] ||
+    die "This server is already set up. Run 'sudo byteguard uninstall' first if you want to replace it with this backup."
+  local data status=0
+  data="$(mktemp)"
+  restore_data "$data"
+  "$LAUNCHER" restore "$data" "$@" || status=$?
+  rm -f "$data"
+  return "$status"
+}
+
 usage() {
   cat <<'EOF'
 Usage: sudo bash byteguard.sh [setup options]
@@ -86,6 +100,11 @@ Without options it asks for each setting.
   --subnet NETWORK      private network for the VPN (default 10.66.66.0/24)
   --first-device NAME   name of the first device (default phone)
   --non-interactive     ask nothing; use the given values and detect the rest
+
+A backup file made by ByteGuard is this same installer with the server's
+data inside. Running it on a fresh server restores everything:
+
+  sudo bash byteguard-backup-NAME.sh [--iface NAME] [--endpoint ADDRESS] [--yes]
 EOF
 }
 
@@ -100,6 +119,10 @@ main() {
   install_packages
   install_program
   msg "ByteGuard ${BYTEGUARD_VERSION} is installed."
+  if declare -F restore_data >/dev/null; then
+    restore_backup "$@"
+    return
+  fi
   if [[ -f $STATE_FILE ]]; then
     msg "This server is already set up, so only the program was updated."
     msg "Run 'sudo byteguard' to manage it."

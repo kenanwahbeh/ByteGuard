@@ -11,8 +11,8 @@ command, lets you manage its devices from a web page, and brings the whole
 setup back from a single backup file after a server reinstall.
 
 > **Status:** version 2 is in development and has no release yet. The VPN
-> server and device management from the terminal work. The web interface
-> and backups are not built yet, so for now a server wipe loses the devices.
+> server, device management from the terminal and backups work. The web
+> interface is not built yet.
 > The previous single-file script is still available as release
 > [v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0).
 
@@ -31,6 +31,12 @@ setup back from a single backup file after a server reinstall.
   ones. It never flushes a chain, and uninstalling removes exactly what it
   added.
 
+- A backup after every change, with nothing to press. The backup is one
+  runnable file: run it on a fresh server and the VPN comes back with the
+  same keys, so devices reconnect without new settings. It is written to
+  `/var/backups/byteguard/` and can also be sent to a Telegram chat each
+  time.
+
 ## Still to come
 
 - A web interface in Arabic and English for the same device management,
@@ -38,10 +44,8 @@ setup back from a single backup file after a server reinstall.
 - The web interface will never be put on an open port. It will be reached
   through a Cloudflare Tunnel on your own domain, or only from inside the
   VPN.
-- A backup after every change, which you can download or have sent to a
-  Telegram bot or to S3-compatible storage such as Cloudflare R2. A backup
-  will be one runnable file that restores everything on a fresh server. It
-  will not be encrypted, so it has to be kept somewhere private.
+- Sending backups to S3-compatible storage such as Cloudflare R2, and
+  downloading them from the web interface.
 
 Everything runs on your server and your own accounts. ByteGuard has no
 hosted service and collects no data.
@@ -76,11 +80,37 @@ Afterwards, `sudo byteguard` opens a menu. The same actions are commands:
 | `sudo byteguard enable NAME` | Let a disabled device connect again |
 | `sudo byteguard remove NAME` | Delete a device |
 | `sudo byteguard port NUMBER` | Move the VPN to another UDP port; every device then needs its configuration again |
+| `sudo byteguard backup` | Make a backup now |
+| `sudo byteguard backup telegram` | Send every backup to a Telegram chat through your own bot (`--off` stops it) |
 | `sudo byteguard uninstall` | Remove the VPN, its keys and ByteGuard |
 
 The server's keys and the devices are stored in
 `/etc/byteguard/state.json`, readable only by root.
 `/etc/wireguard/wg0.conf` is generated from it and should not be edited.
+
+## Backups
+
+Every change (a device added, removed, enabled or disabled, the port
+moved) rewrites the backup file in `/var/backups/byteguard/` straight
+away. A file on the server does not survive the server being wiped, so
+send it somewhere else as well: `sudo byteguard backup telegram` asks for
+the token of a bot you create with @BotFather and then delivers every new
+backup to your chat.
+
+To restore, copy the backup file to a fresh server and run it:
+
+```bash
+sudo bash byteguard-backup-NAME.sh
+```
+
+Devices reconnect on their own when the new server has the same public
+address, or when they were set up with a host name that you point at the
+new server. If the address changed, pass `--endpoint NEW_ADDRESS`; every
+device then needs its configuration again.
+
+**A backup is not encrypted.** It holds the server's key, every device's
+key and the Telegram bot token. Anyone who gets the file can connect to
+your VPN, so keep it, and the chat it is sent to, private.
 
 ## Development
 
