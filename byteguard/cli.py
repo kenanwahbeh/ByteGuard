@@ -6,7 +6,7 @@ import ipaddress
 import sys
 from pathlib import Path
 
-from byteguard import __version__, backup, netdetect, telegram, wizard
+from byteguard import __version__, backup, netdetect, telegram, tunnel, wizard
 from byteguard.errors import ByteGuardError
 from byteguard.manager import DEFAULT_SUBNET, DEFAULT_UI_PORT, Manager, check_subnet
 from byteguard.paths import INTERFACE
@@ -66,8 +66,14 @@ def build_parser() -> argparse.ArgumentParser:
     port.add_argument("number", type=int)
     port.set_defaults(handler=_port)
 
-    ui = commands.add_parser("ui", help="turn the web interface on (`ui setup`) or off (`ui off`)")
-    ui.add_argument("action", choices=["setup", "off"])
+    ui = commands.add_parser(
+        "ui",
+        help="web interface: `ui setup` turns it on, `ui off` turns it off, "
+        "`ui tunnel` serves it on your own domain through Cloudflare (`ui tunnel --off` stops that)",
+    )
+    ui.add_argument("action", choices=["setup", "off", "tunnel"])
+    ui.add_argument("--hostname", help="with `tunnel`: the name to serve it on, such as vpn.example.com")
+    ui.add_argument("--off", action="store_true", help="with `tunnel`: stop serving it through Cloudflare")
     ui.add_argument("--port", type=int, default=DEFAULT_UI_PORT, help=f"port inside the VPN (default {DEFAULT_UI_PORT})")
     ui.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
     ui.set_defaults(handler=_ui)
@@ -175,9 +181,65 @@ def _ui(args, manager: Manager) -> None:
         manager.disable_ui()
         print("The web interface is off.")
         return
+    if args.action == "tunnel":
+        _tunnel(args, manager)
+        return
     manager.server()
     password = sys.stdin.readline().rstrip("\n") if args.password_stdin else _new_password(open_terminal())
     _enable_ui(manager, password, args.port)
+
+
+def _tunnel(args, manager: Manager) -> None:
+    if args.off:
+        settings = manager.tunnel()
+        manager.disable_tunnel()
+        print("The web interface is no longer served through Cloudflare.")
+        if settings:
+            print(f"The tunnel {settings['name']} and the DNS record {settings['hostname']} still exist in your")
+            print("Cloudflare account. Delete them there if you no longer want them.")
+        return
+    target = manager.ui_target()
+    term = open_terminal()
+    run = manager.run
+
+    hostname = args.hostname or term.ask("Name to open the web interface on, such as vpn.example.com")
+    if not netdetect.HOSTNAME_RE.fullmatch(hostname):
+        raise ByteGuardError(f"{hostname!r} is not a host name.")
+    zone, servers = tunnel.zone_of(hostname)
+    if not tunnel.on_cloudflare(servers):
+        term.say(f"{zone} is not on Cloudflare: its name servers are {', '.join(servers)}.")
+        term.say("A tunnel needs the domain in a Cloudflare account, and the free plan is enough:")
+        term.say("  1. Add the domain at https://dash.cloudflare.com and check that every DNS record")
+        term.say("     was imported. Changing name servers moves the website and email records too.")
+        term.say("  2. Set the name servers Cloudflare shows you at the company you bought the domain from.")
+        term.say("  3. When Cloudflare says the domain is active, run this command again.")
+        raise ByteGuardError("Nothing was changed. The web interface stays reachable from inside the VPN.")
+
+    if tunnel.other_tunnel_running(run):
+        term.say("This server already runs a Cloudflare tunnel. ByteGuard will not touch it.")
+        if not term.confirm("Create a separate tunnel just for the web interface?"):
+            _manual_tunnel(term, hostname, target)
+            return
+    elif not term.confirm("Let ByteGuard create the tunnel? Answer no to set it up yourself"):
+        _manual_tunnel(term, hostname, target)
+        return
+
+    if not tunnel.installed(run):
+        term.say("Installing cloudflared from Cloudflare's GitHub releases.")
+        tunnel.install(run)
+    term.say("Open the link below in a browser, sign in to Cloudflare and choose " + zone + ".")
+    created = tunnel.create(run, manager.paths.tunnel_dir.with_name("cloudflared-setup"), hostname)
+    address = manager.enable_tunnel(hostname, created)
+    term.say(f"The web interface is now at {address}")
+    term.say("It can take a minute to answer the first time.")
+    term.say("Anyone who knows the address can reach the sign-in page, so use a strong password.")
+
+
+def _manual_tunnel(term: Terminal, hostname: str, target: str) -> None:
+    term.say("To set it up yourself, add a public hostname to your tunnel:")
+    term.say(f"  hostname: {hostname}")
+    term.say(f"  service:  {target}")
+    term.say("Nothing was changed on this server.")
 
 
 def _serve(args, manager: Manager) -> None:

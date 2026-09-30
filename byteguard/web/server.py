@@ -164,6 +164,9 @@ class Handler(BaseHTTPRequestHandler):
             sessions.record_failure()
             raise Problem(HTTPStatus.UNAUTHORIZED, "password")
         cookie = f"{COOKIE}={sessions.start()}; Path=/; HttpOnly; SameSite=Strict; Max-Age={auth.SESSION_SECONDS}"
+        if self.headers.get("X-Forwarded-Proto") == "https":
+            # Reached through the tunnel: never send the cookie over plain HTTP.
+            cookie += "; Secure"
         self._json({"ok": True}, headers={"Set-Cookie": cookie})
 
     def _logout(self) -> None:

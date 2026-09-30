@@ -81,9 +81,9 @@ class WebTestCase(unittest.TestCase):
         self.addCleanup(self.httpd.shutdown)
         self.cookie = None
 
-    def request(self, method, path, body=None, *, csrf=True, cookie=True):
+    def request(self, method, path, body=None, *, csrf=True, cookie=True, headers=None):
         connection = http.client.HTTPConnection("127.0.0.1", self.httpd.server_address[1], timeout=10)
-        headers = {}
+        headers = dict(headers or {})
         if csrf:
             headers["X-ByteGuard"] = "1"
         if cookie and self.cookie:
@@ -121,6 +121,13 @@ class LoginTest(WebTestCase):
         self.assertIn("HttpOnly", response.headers["Set-Cookie"])
         self.assertIn("SameSite=Strict", response.headers["Set-Cookie"])
         self.assertEqual(self.request("GET", "/api/state")[0].status, 200)
+
+    def test_through_the_tunnel_the_cookie_is_only_ever_sent_over_https(self):
+        direct, _ = self.request("POST", "/api/login", {"password": PASSWORD})
+        tunnelled, _ = self.request("POST", "/api/login", {"password": PASSWORD}, headers={"X-Forwarded-Proto": "https"})
+
+        self.assertNotIn("Secure", direct.headers["Set-Cookie"])
+        self.assertIn("; Secure", tunnelled.headers["Set-Cookie"])
 
     def test_guessing_is_cut_off_even_for_the_right_password(self):
         for _ in range(auth.MAX_FAILURES):
