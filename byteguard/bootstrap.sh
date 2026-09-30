@@ -83,6 +83,7 @@ Without options it asks for each setting.
   --iface NAME          network card that faces the internet
   --endpoint ADDRESS    public IP or host name devices connect to
   --port NUMBER         WireGuard UDP port (default 51820)
+  --subnet NETWORK      private network for the VPN (default 10.66.66.0/24)
   --first-device NAME   name of the first device (default phone)
   --non-interactive     ask nothing; use the given values and detect the rest
 EOF

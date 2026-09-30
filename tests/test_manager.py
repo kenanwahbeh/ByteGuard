@@ -44,6 +44,21 @@ class SetUpTest(ManagerTestCase):
         self.assertEqual(manager.run.ran("ufw"), ["ufw status"])
         self.assertIn("PostUp = iptables -w -I FORWARD -i %i -j ACCEPT", manager.paths.wg_conf.read_text())
 
+    def test_a_chosen_network_gives_the_server_its_first_address_and_devices_the_next(self):
+        manager = self.manager()
+        manager.set_up(iface="eth0", endpoint="203.0.113.7", port=51820, subnet="10.11.12.0/24")
+
+        self.assertEqual(manager.server()["address"], "10.11.12.1")
+        self.assertEqual(manager.add_device("phone")["address"], "10.11.12.2")
+        self.assertIn("-s 10.11.12.0/24 -o eth0 -j MASQUERADE", manager.paths.wg_conf.read_text())
+
+    def test_a_network_that_is_public_malformed_or_too_small_is_refused(self):
+        for subnet in ("8.8.8.0/24", "ten", "10.11.12.0/31"):
+            manager = self.manager()
+            with self.subTest(subnet=subnet), self.assertRaises(ByteGuardError):
+                manager.set_up(iface="eth0", endpoint="203.0.113.7", port=51820, subnet=subnet)
+            self.assertEqual(manager.run.calls, [])
+
     def test_it_refuses_to_run_twice(self):
         manager = self.set_up()
 

@@ -60,6 +60,10 @@ device's configuration and QR code. To skip the questions, pass
 `--non-interactive` with any of `--iface`, `--endpoint`, `--port` and
 `--first-device`; whatever is left out is detected.
 
+The VPN uses the private network `10.66.66.0/24` unless you pass another
+one, for example `--subnet 10.11.12.0/24`. The server takes the first
+address in it and devices get the ones after.
+
 Afterwards, `sudo byteguard` opens a menu. The same actions are commands:
 
 | Command | What it does |

@@ -19,6 +19,7 @@ and there is no migration from a version 1 script.
   the port, with a `--non-interactive` mode.
 - The `byteguard` command: `add`, `show`, `list`, `status`, `enable`,
   `disable`, `remove` and `uninstall`, and a menu when run without a command.
+- `--subnet` to choose the VPN's private network at setup.
 - Firewall handling that uses ufw when it is active and iptables otherwise,
   and removes exactly the rules it added.
 
