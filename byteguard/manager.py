@@ -78,10 +78,11 @@ WantedBy=multi-user.target
 
 
 class Manager:
-    def __init__(self, paths: Paths | None = None, run=system.run, send=telegram.send_document):
+    def __init__(self, paths: Paths | None = None, run=system.run, send=telegram.send_document, upload=None):
         self.paths = paths or Paths()
         self.run = run
         self.send = send
+        self.upload = upload
         # What the backup after the latest change did, per destination.
         self.last_backup: dict = {}
         # Problems that did not stop an operation but the user should hear about.
@@ -91,7 +92,8 @@ class Manager:
         """Save the state, then back it up. A failed backup never undoes the change."""
         state.save(self.paths.state, data)
         try:
-            self.last_backup = backup.run(self.paths, data, self.send)
+            options = {"upload": self.upload} if self.upload else {}
+            self.last_backup = backup.run(self.paths, data, self.send, **options)
         except (OSError, ValueError) as error:
             self.last_backup = {"local": {"ok": False, "error": str(error)}}
 
@@ -102,6 +104,20 @@ class Manager:
 
     def telegram_chat(self) -> dict | None:
         return self._state().get("backup", {}).get("telegram")
+
+    def s3_settings(self) -> dict | None:
+        return self._state().get("backup", {}).get("s3")
+
+    def set_s3(self, settings: dict | None) -> None:
+        """Upload every backup to this S3-compatible bucket, or stop with None."""
+        with state.locked(self.paths.lock):
+            data = self._state()
+            destinations = data.setdefault("backup", {})
+            if settings is None:
+                destinations.pop("s3", None)
+            else:
+                destinations["s3"] = settings
+            self._save(data)
 
     def set_telegram(self, token: str | None, chat_id: int | None = None) -> None:
         """Send every backup to this Telegram chat, or stop with token None."""

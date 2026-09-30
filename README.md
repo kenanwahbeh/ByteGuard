@@ -12,7 +12,7 @@ setup back from a single backup file after a server reinstall.
 
 > **Status:** version 2 is in development and has no release yet. The VPN
 > server, device management, backups, the web interface and its Cloudflare
-> Tunnel work. Backups to S3-compatible storage are not built yet.
+> Tunnel work.
 > The previous single-file script is still available as release
 > [v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0).
 
@@ -34,8 +34,8 @@ setup back from a single backup file after a server reinstall.
 - A backup after every change, with nothing to press. The backup is one
   runnable file: run it on a fresh server and the VPN comes back with the
   same keys, so devices reconnect without new settings. It is written to
-  `/var/backups/byteguard/` and can also be sent to a Telegram chat each
-  time.
+  `/var/backups/byteguard/` and can also be sent to a Telegram chat and
+  uploaded to S3-compatible storage such as Cloudflare R2 each time.
 
 - A web interface in Arabic and English: add and remove devices, show
   their QR codes, see who is connected, switch a device off, make and
@@ -45,10 +45,6 @@ setup back from a single backup file after a server reinstall.
 - Optionally, the web interface on your own domain through a Cloudflare
   Tunnel, with no port opened. ByteGuard creates a tunnel of its own and
   never touches a cloudflared that is already on the server.
-
-## Still to come
-
-- Sending backups to S3-compatible storage such as Cloudflare R2.
 
 Everything runs on your server and your own accounts. ByteGuard has no
 hosted service and collects no data.
@@ -87,6 +83,7 @@ Afterwards, `sudo byteguard` opens a menu. The same actions are commands:
 | `sudo byteguard ui tunnel` | Serve the web interface on your own domain through Cloudflare (`--off` stops it) |
 | `sudo byteguard backup` | Make a backup now |
 | `sudo byteguard backup telegram` | Send every backup to a Telegram chat through your own bot (`--off` stops it) |
+| `sudo byteguard backup s3` | Upload every backup to S3-compatible storage such as Cloudflare R2 (`--off` stops it) |
 | `sudo byteguard uninstall` | Remove the VPN, its keys and ByteGuard |
 
 The server's keys and the devices are stored in
@@ -139,6 +136,16 @@ send it somewhere else as well: `sudo byteguard backup telegram` asks for
 the token of a bot you create with @BotFather and then delivers every new
 backup to your chat.
 
+Backups can also go to any S3-compatible storage: Cloudflare R2, AWS S3,
+Backblaze B2 and others. For R2, create a bucket and an API token with
+Object Read & Write on that bucket only, then run `sudo byteguard backup s3`
+(or use the form in the web interface) with the endpoint
+`https://<account id>.r2.cloudflarestorage.com`. A test upload is made
+before anything is saved. Each backup is stored under
+`byteguard/byteguard-backup-<server>-<time>.sh`, and the newest 10 are
+kept. R2 needs a payment method on the Cloudflare account even when usage
+stays within the free allowance.
+
 To restore, copy the backup file to a fresh server and run it:
 
 ```bash
@@ -151,7 +158,7 @@ new server. If the address changed, pass `--endpoint NEW_ADDRESS`; every
 device then needs its configuration again.
 
 **A backup is not encrypted.** It holds the server's key, every device's
-key and the Telegram bot token. Anyone who gets the file can connect to
+key, the Telegram bot token and the storage keys. Anyone who gets the file can connect to
 your VPN, so keep it, and the chat it is sent to, private.
 
 ## Development

@@ -99,7 +99,8 @@ button:disabled { opacity: 0.6; cursor: default; }
 
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
 .row input { flex: 1 1 180px; }
-#login-form { display: grid; gap: 10px; }
+#login-form, .stack { display: grid; gap: 6px; }
+.stack button { justify-self: start; margin-top: 6px; }
 
 .notice { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); }
 .notice.error { border-color: var(--bad); color: var(--bad); }

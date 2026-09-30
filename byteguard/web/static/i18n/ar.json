@@ -43,5 +43,17 @@
   "error_locked": "محاولات خاطئة كثيرة. حاول بعد بضع دقائق.",
   "error_generic": "حدث خطأ. حاول مرة أخرى.",
   "error_network": "تعذّر الوصول إلى السيرفر.",
-  "server_line": "{endpoint}، منفذ UDP ‏{port}"
+  "server_line": "{endpoint}، منفذ UDP ‏{port}",
+  "s3_title": "تخزين S3 (Cloudflare R2 وغيره)",
+  "s3_endpoint": "عنوان الخدمة",
+  "s3_bucket": "اسم الـ bucket",
+  "s3_access": "معرّف مفتاح الوصول",
+  "s3_secret": "المفتاح السري",
+  "s3_region": "المنطقة",
+  "s3_connect": "ربط وتجربة",
+  "s3_help": "في R2 أنشئ bucket ورمز API بصلاحية قراءة وكتابة الكائنات على هذا الـ bucket فقط. تُحفظ آخر 10 نسخ.",
+  "s3_on": "كل نسخة تُرفع إلى الـ bucket الخاص بك.",
+  "s3_not_set": "غير مربوط.",
+  "s3_connected": "تم الربط. رُفعت أول نسخة باسم {key}.",
+  "s3_off": "إيقاف الرفع إلى S3"
 }

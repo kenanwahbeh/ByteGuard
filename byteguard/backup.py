@@ -9,7 +9,7 @@ import json
 import socket
 from pathlib import Path
 
-from byteguard import __version__, bundle, state, telegram
+from byteguard import __version__, bundle, s3, state, telegram
 from byteguard.errors import ByteGuardError
 from byteguard.paths import Paths
 
@@ -38,7 +38,7 @@ def read_payload(path: Path) -> dict:
     return payload
 
 
-def run(paths: Paths, data: dict, send=telegram.send_document) -> dict:
+def run(paths: Paths, data: dict, send=telegram.send_document, upload=s3.upload) -> dict:
     """Write the backup on the server and send it wherever backups are set to go.
 
     Returns what happened per destination and records it for the next status check.
@@ -57,6 +57,13 @@ def run(paths: Paths, data: dict, send=telegram.send_document) -> dict:
             results["telegram"] = {"ok": True}
         except ByteGuardError as error:
             results["telegram"] = {"ok": False, "error": str(error)}
+
+    storage = data.get("backup", {}).get("s3")
+    if storage:
+        try:
+            results["s3"] = {"ok": True, "key": upload(storage, socket.gethostname(), text)}
+        except ByteGuardError as error:
+            results["s3"] = {"ok": False, "error": str(error)}
 
     made_at = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
     state.write_private(paths.backup_status, json.dumps({"made_at": made_at, **results}, indent=2) + "\n")

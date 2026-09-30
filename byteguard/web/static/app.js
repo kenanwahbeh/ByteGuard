@@ -170,6 +170,9 @@ async function refresh() {
   $("telegram-state").textContent = t(state.backup.telegram ? "telegram_on" : "telegram_not_set");
   $("telegram-off").hidden = !state.backup.telegram;
   $("telegram-form").hidden = state.backup.telegram;
+  $("s3-state").textContent = t(state.backup.s3 ? "s3_on" : "s3_not_set");
+  $("s3-off").hidden = !state.backup.s3;
+  $("s3-form").hidden = state.backup.s3;
 }
 
 function reportBackup(results) {
@@ -249,6 +252,37 @@ $("telegram-form").addEventListener("submit", async (event) => {
 $("telegram-off").addEventListener("click", async () => {
   try {
     await api("DELETE", "/api/backup/telegram");
+    await refresh();
+  } catch (error) {
+    explain(error);
+  }
+});
+
+$("s3-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  button.disabled = true;
+  try {
+    const result = await api("POST", "/api/backup/s3", {
+      endpoint: $("s3-endpoint").value.trim(),
+      bucket: $("s3-bucket").value.trim(),
+      access_key: $("s3-access").value.trim(),
+      secret_key: $("s3-secret").value,
+      region: $("s3-region").value.trim(),
+    });
+    $("s3-secret").value = "";
+    notify(t("s3_connected", { key: result.key }));
+    await refresh();
+  } catch (error) {
+    explain(error);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("s3-off").addEventListener("click", async () => {
+  try {
+    await api("DELETE", "/api/backup/s3");
     await refresh();
   } catch (error) {
     explain(error);
