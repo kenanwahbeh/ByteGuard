@@ -68,6 +68,7 @@ wg show wg0 >/dev/null || fail "wg0 is not up after the install"
 systemctl is-enabled --quiet wg-quick@wg0 || fail "wg0 would not come back after a reboot"
 [[ "$(stat -c %a /etc/byteguard/state.json)" == 600 ]] || fail "the state file is readable by others"
 server_key="$(wg show wg0 public-key)"
+[[ -n "$(wg show wg0 peers)" ]] || fail "the first device was not applied to the running interface"
 
 step "Connect the first device from a network namespace"
 ip netns add "$NAMESPACE"
