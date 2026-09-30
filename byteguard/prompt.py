@@ -1,14 +1,22 @@
 """Asking questions on the terminal."""
 
+import getpass
 import sys
 
 from byteguard.errors import ByteGuardError
 
 
 class Terminal:
-    def __init__(self, read_line, write):
+    def __init__(self, read_line, write, read_secret=None):
         self._read_line = read_line
         self._write = write
+        self._read_secret = read_secret
+
+    def ask_secret(self, question: str) -> str:
+        """Ask without showing what is typed, where the terminal allows it."""
+        if self._read_secret is None:
+            return self._answer(f"{question}: ")
+        return self._read_secret(f"{question}: ")
 
     def say(self, text: str = "") -> None:
         self._write(text + "\n")
@@ -53,7 +61,7 @@ def open_terminal() -> Terminal:
         sys.stdout.flush()
 
     if sys.stdin.isatty():
-        return Terminal(sys.stdin.readline, write_stdout)
+        return Terminal(sys.stdin.readline, write_stdout, getpass.getpass)
     try:
         tty = open("/dev/tty", "r+")
     except OSError:
@@ -66,4 +74,5 @@ def open_terminal() -> Terminal:
         tty.write(text)
         tty.flush()
 
-    return Terminal(tty.readline, write_tty)
+    # getpass reads from /dev/tty itself.
+    return Terminal(tty.readline, write_tty, getpass.getpass)

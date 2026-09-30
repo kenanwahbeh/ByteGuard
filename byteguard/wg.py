@@ -48,7 +48,11 @@ def server_config(state: dict) -> str:
     server = state["server"]
     prefix = ipaddress.ip_network(server["subnet"]).prefixlen
     up, down = firewall.hooks(
-        state["firewall"]["mode"], server["iface"], server["port"], server["subnet"]
+        state["firewall"]["mode"],
+        server["iface"],
+        server["port"],
+        server["subnet"],
+        state.get("ui", {}).get("port"),
     )
     lines = [
         CONF_HEADER,

@@ -60,6 +60,7 @@ def temp_paths(testcase) -> Paths:
         program=root / "opt/byteguard",
         launcher=root / "usr/local/bin/byteguard",
         backups=root / "var/backups/byteguard",
+        ui_unit=root / "etc/systemd/system/byteguard-ui.service",
     )
 
 

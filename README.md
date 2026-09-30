@@ -11,8 +11,8 @@ command, lets you manage its devices from a web page, and brings the whole
 setup back from a single backup file after a server reinstall.
 
 > **Status:** version 2 is in development and has no release yet. The VPN
-> server, device management from the terminal and backups work. The web
-> interface is not built yet.
+> server, device management, backups and the web interface work. Reaching
+> the web interface through a Cloudflare Tunnel is not built yet.
 > The previous single-file script is still available as release
 > [v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0).
 
@@ -37,15 +37,16 @@ setup back from a single backup file after a server reinstall.
   `/var/backups/byteguard/` and can also be sent to a Telegram chat each
   time.
 
+- A web interface in Arabic and English: add and remove devices, show
+  their QR codes, see who is connected, switch a device off, make and
+  download backups, and connect Telegram. It listens only on the server's
+  address inside the VPN, so only connected devices can open it.
+
 ## Still to come
 
-- A web interface in Arabic and English for the same device management,
-  with connection status for each device.
-- The web interface will never be put on an open port. It will be reached
-  through a Cloudflare Tunnel on your own domain, or only from inside the
-  VPN.
-- Sending backups to S3-compatible storage such as Cloudflare R2, and
-  downloading them from the web interface.
+- Reaching the web interface through a Cloudflare Tunnel on your own
+  domain, without opening a port.
+- Sending backups to S3-compatible storage such as Cloudflare R2.
 
 Everything runs on your server and your own accounts. ByteGuard has no
 hosted service and collects no data.
@@ -80,6 +81,7 @@ Afterwards, `sudo byteguard` opens a menu. The same actions are commands:
 | `sudo byteguard enable NAME` | Let a disabled device connect again |
 | `sudo byteguard remove NAME` | Delete a device |
 | `sudo byteguard port NUMBER` | Move the VPN to another UDP port; every device then needs its configuration again |
+| `sudo byteguard ui setup` | Turn the web interface on and set its password (`ui off` turns it off) |
 | `sudo byteguard backup` | Make a backup now |
 | `sudo byteguard backup telegram` | Send every backup to a Telegram chat through your own bot (`--off` stops it) |
 | `sudo byteguard uninstall` | Remove the VPN, its keys and ByteGuard |
@@ -87,6 +89,19 @@ Afterwards, `sudo byteguard` opens a menu. The same actions are commands:
 The server's keys and the devices are stored in
 `/etc/byteguard/state.json`, readable only by root.
 `/etc/wireguard/wg0.conf` is generated from it and should not be edited.
+
+## Web interface
+
+`sudo byteguard ui setup` asks for a password and turns the web interface
+on at `http://<server's VPN address>:51821`, for example
+`http://10.66.66.1:51821`. Open it from a device that is connected to the
+VPN; from anywhere else the address does not answer. The page is in
+English or Arabic, and the button in the top corner switches between them.
+
+The interface runs as its own service with a read-only view of the system
+apart from ByteGuard's files. Eight wrong passwords lock sign-in for five
+minutes. Running `ui setup` again changes the password and signs everyone
+out.
 
 ## Backups
 

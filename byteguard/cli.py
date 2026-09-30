@@ -8,7 +8,7 @@ from pathlib import Path
 
 from byteguard import __version__, backup, netdetect, telegram, wizard
 from byteguard.errors import ByteGuardError
-from byteguard.manager import DEFAULT_SUBNET, Manager, check_subnet
+from byteguard.manager import DEFAULT_SUBNET, DEFAULT_UI_PORT, Manager, check_subnet
 from byteguard.paths import INTERFACE
 from byteguard.prompt import Terminal, open_terminal
 
@@ -65,6 +65,15 @@ def build_parser() -> argparse.ArgumentParser:
     port = commands.add_parser("port", help="move the VPN to another UDP port")
     port.add_argument("number", type=int)
     port.set_defaults(handler=_port)
+
+    ui = commands.add_parser("ui", help="turn the web interface on (`ui setup`) or off (`ui off`)")
+    ui.add_argument("action", choices=["setup", "off"])
+    ui.add_argument("--port", type=int, default=DEFAULT_UI_PORT, help=f"port inside the VPN (default {DEFAULT_UI_PORT})")
+    ui.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
+    ui.set_defaults(handler=_ui)
+
+    # Run by the byteguard-ui service.
+    commands.add_parser("serve", help=argparse.SUPPRESS).set_defaults(handler=_serve)
 
     back_up = commands.add_parser(
         "backup",
@@ -135,6 +144,53 @@ def _setup(args, manager: Manager) -> None:
     manager.add_device(answers.first_device)
     _print_device(manager, answers.first_device, qr=True)
     print("Run `sudo byteguard` to add more devices.")
+    if args.non_interactive:
+        return
+    term = open_terminal()
+    if term.confirm("Turn on the web interface? It is reachable only from devices connected to the VPN", default=False):
+        _enable_ui(manager, _new_password(term), DEFAULT_UI_PORT)
+    else:
+        print("You can turn it on later with `sudo byteguard ui setup`.")
+
+
+def _new_password(term: Terminal) -> str:
+    while True:
+        password = term.ask_secret("Password for the web interface (8 characters or more)")
+        if len(password) < 8:
+            term.say("That is too short.")
+        elif term.ask_secret("The same password again") != password:
+            term.say("The two did not match.")
+        else:
+            return password
+
+
+def _enable_ui(manager: Manager, password: str, port: int) -> None:
+    address = manager.enable_ui(password, port)
+    print(f"The web interface is on: {address}")
+    print("Open it from a device that is connected to the VPN.")
+
+
+def _ui(args, manager: Manager) -> None:
+    if args.action == "off":
+        manager.disable_ui()
+        print("The web interface is off.")
+        return
+    manager.server()
+    password = sys.stdin.readline().rstrip("\n") if args.password_stdin else _new_password(open_terminal())
+    _enable_ui(manager, password, args.port)
+
+
+def _serve(args, manager: Manager) -> None:
+    from byteguard.web import server
+
+    settings = manager.ui()
+    if settings is None:
+        raise ByteGuardError("The web interface is off. Turn it on with `sudo byteguard ui setup`.")
+    httpd = server.make_server(server.App(manager), manager.server()["address"], settings["port"])
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
 
 
 def _list(args, manager: Manager) -> None:
