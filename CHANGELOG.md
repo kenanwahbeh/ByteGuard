@@ -28,6 +28,8 @@ and there is no migration from a version 1 script.
 - A web interface in Arabic and English, reachable only from inside the
   VPN: devices, QR codes, connection status, backups and Telegram.
   `byteguard ui setup` turns it on.
+- `byteguard ui tunnel`: the web interface on the user's own domain through
+  a Cloudflare Tunnel that ByteGuard creates and runs as its own service.
 - Firewall handling that uses ufw when it is active and iptables otherwise,
   and removes exactly the rules it added.
 

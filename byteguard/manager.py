@@ -4,10 +4,11 @@ import contextlib
 import copy
 import datetime
 import ipaddress
+import json
 import shutil
 import tempfile
 
-from byteguard import backup, firewall, state, system, telegram, wg
+from byteguard import backup, firewall, state, system, telegram, tunnel, wg
 from byteguard.errors import ByteGuardError
 from byteguard.paths import INTERFACE, Paths
 from byteguard.web import auth
@@ -46,6 +47,30 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
 MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+TUNNEL_SERVICE = "byteguard-tunnel"
+
+TUNNEL_UNIT = """\
+[Unit]
+Description=ByteGuard web interface tunnel (Cloudflare)
+After=network-online.target {ui}.service
+Wants=network-online.target
+
+[Service]
+ExecStart={cloudflared} tunnel --no-autoupdate --config {config} run
+Restart=on-failure
+RestartSec=5
+CapabilityBoundingSet=
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
 
 [Install]
 WantedBy=multi-user.target
@@ -136,10 +161,63 @@ class Manager:
     def disable_ui(self) -> None:
         with state.locked(self.paths.lock):
             data = self._state()
+            # Without the web interface the tunnel has nothing to serve.
+            self._stop_tunnel(data)
+            data.pop("tunnel", None)
             self._stop_ui(data)
             data.pop("ui", None)
             state.write_private(self.paths.wg_conf, wg.server_config(data))
             self._save(data)
+
+    def tunnel(self) -> dict | None:
+        return self._state().get("tunnel")
+
+    def ui_target(self) -> str:
+        """Where the web interface listens, for a tunnel to be pointed at."""
+        data = self._state()
+        if "ui" not in data:
+            raise ByteGuardError("The web interface is off. Turn it on first with `sudo byteguard ui setup`.")
+        return f"http://{data['server']['address']}:{data['ui']['port']}"
+
+    def enable_tunnel(self, hostname: str, created: dict) -> str:
+        """Serve the web interface at https://hostname through the tunnel just created."""
+        target = self.ui_target()
+        with state.locked(self.paths.lock):
+            data = self._state()
+            self._stop_tunnel(data)
+            data["tunnel"] = {"hostname": hostname, **created}
+            self._start_tunnel(data, target)
+            self._save(data)
+        return f"https://{hostname}"
+
+    def disable_tunnel(self) -> None:
+        with state.locked(self.paths.lock):
+            data = self._state()
+            self._stop_tunnel(data)
+            data.pop("tunnel", None)
+            self._save(data)
+
+    def _start_tunnel(self, data: dict, target: str) -> None:
+        settings = data["tunnel"]
+        folder = self.paths.tunnel_dir
+        credentials = folder / f"{settings['id']}.json"
+        state.write_private(credentials, json.dumps(settings["credentials"]))
+        config = folder / "config.yml"
+        state.write_private(config, tunnel.config(settings["id"], credentials, settings["hostname"], target))
+        cloudflared = self.run(["sh", "-c", "command -v cloudflared"]).stdout.strip()
+        self.paths.tunnel_unit.parent.mkdir(parents=True, exist_ok=True)
+        self.paths.tunnel_unit.write_text(TUNNEL_UNIT.format(ui=UI_SERVICE, cloudflared=cloudflared, config=config))
+        self.run(["systemctl", "daemon-reload"])
+        self.run(["systemctl", "enable", TUNNEL_SERVICE])
+        self.run(["systemctl", "restart", TUNNEL_SERVICE])
+
+    def _stop_tunnel(self, data: dict) -> None:
+        if "tunnel" not in data:
+            return
+        self.run(["systemctl", "disable", "--now", TUNNEL_SERVICE], check=False)
+        self.paths.tunnel_unit.unlink(missing_ok=True)
+        self.run(["systemctl", "daemon-reload"], check=False)
+        shutil.rmtree(self.paths.tunnel_dir, ignore_errors=True)
 
     def _start_ui(self, data: dict) -> None:
         firewall.open_ui(self.run, data["firewall"]["mode"], data["ui"]["port"])
@@ -246,6 +324,10 @@ class Manager:
             self.run(["systemctl", "enable", "--now", SERVICE])
             if "ui" in data:
                 self._start_ui(data)
+            if "tunnel" in data:
+                if not tunnel.installed(self.run):
+                    tunnel.install(self.run)
+                self._start_tunnel(data, f"http://{server['address']}:{data['ui']['port']}")
         except BaseException:
             # Leave the server as it was found, so this can simply be run again.
             self._tear_down(data)
@@ -264,6 +346,7 @@ class Manager:
 
     def _tear_down(self, data: dict) -> None:
         server = data["server"]
+        self._stop_tunnel(data)
         self._stop_ui(data)
         # Stopping the interface runs PostDown, which removes its iptables rules.
         self.run(["systemctl", "disable", "--now", SERVICE], check=False)

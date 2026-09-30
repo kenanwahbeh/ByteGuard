@@ -11,8 +11,8 @@ command, lets you manage its devices from a web page, and brings the whole
 setup back from a single backup file after a server reinstall.
 
 > **Status:** version 2 is in development and has no release yet. The VPN
-> server, device management, backups and the web interface work. Reaching
-> the web interface through a Cloudflare Tunnel is not built yet.
+> server, device management, backups, the web interface and its Cloudflare
+> Tunnel work. Backups to S3-compatible storage are not built yet.
 > The previous single-file script is still available as release
 > [v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0).
 
@@ -42,10 +42,12 @@ setup back from a single backup file after a server reinstall.
   download backups, and connect Telegram. It listens only on the server's
   address inside the VPN, so only connected devices can open it.
 
+- Optionally, the web interface on your own domain through a Cloudflare
+  Tunnel, with no port opened. ByteGuard creates a tunnel of its own and
+  never touches a cloudflared that is already on the server.
+
 ## Still to come
 
-- Reaching the web interface through a Cloudflare Tunnel on your own
-  domain, without opening a port.
 - Sending backups to S3-compatible storage such as Cloudflare R2.
 
 Everything runs on your server and your own accounts. ByteGuard has no
@@ -82,6 +84,7 @@ Afterwards, `sudo byteguard` opens a menu. The same actions are commands:
 | `sudo byteguard remove NAME` | Delete a device |
 | `sudo byteguard port NUMBER` | Move the VPN to another UDP port; every device then needs its configuration again |
 | `sudo byteguard ui setup` | Turn the web interface on and set its password (`ui off` turns it off) |
+| `sudo byteguard ui tunnel` | Serve the web interface on your own domain through Cloudflare (`--off` stops it) |
 | `sudo byteguard backup` | Make a backup now |
 | `sudo byteguard backup telegram` | Send every backup to a Telegram chat through your own bot (`--off` stops it) |
 | `sudo byteguard uninstall` | Remove the VPN, its keys and ByteGuard |
@@ -102,6 +105,29 @@ The interface runs as its own service with a read-only view of the system
 apart from ByteGuard's files. Eight wrong passwords lock sign-in for five
 minutes. Running `ui setup` again changes the password and signs everyone
 out.
+
+### On your own domain
+
+`sudo byteguard ui tunnel` serves the same page at an address such as
+`https://vpn.example.com` through a Cloudflare Tunnel, so you can open it
+without being connected to the VPN and without opening a port. It needs a
+domain that is in your own Cloudflare account; the free plan is enough.
+
+It asks for the name, checks that the domain is on Cloudflare, installs
+`cloudflared` if it is missing, and prints a link. Open the link in a
+browser, sign in to Cloudflare and choose the domain. ByteGuard then
+creates a tunnel, points the name at it and runs it as
+`byteguard-tunnel.service`. The sign-in certificate, which could manage the
+whole domain, is deleted straight away; only that one tunnel's credentials
+stay on the server.
+
+If the server already runs a Cloudflare tunnel, ByteGuard leaves it alone
+and creates a separate one, or tells you the address to point your own
+tunnel at if you prefer.
+
+Once it is on a public address, anyone who knows it can reach the sign-in
+page. Use a strong password, and consider putting Cloudflare Access in
+front of it.
 
 ## Backups
 

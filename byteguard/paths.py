@@ -15,6 +15,7 @@ class Paths:
     launcher: Path = Path("/usr/local/bin/byteguard")
     backups: Path = Path("/var/backups/byteguard")
     ui_unit: Path = Path("/etc/systemd/system/byteguard-ui.service")
+    tunnel_unit: Path = Path("/etc/systemd/system/byteguard-tunnel.service")
 
     @property
     def state(self) -> Path:
@@ -27,6 +28,11 @@ class Paths:
     @property
     def backup_status(self) -> Path:
         return self.etc / "backup-status.json"
+
+    @property
+    def tunnel_dir(self) -> Path:
+        """The UI tunnel's own cloudflared files, apart from any other cloudflared on the host."""
+        return self.etc / "cloudflared"
 
     @property
     def wg_conf(self) -> Path:

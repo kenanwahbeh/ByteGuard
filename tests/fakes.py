@@ -21,7 +21,7 @@ class FakeRun:
         self.failing = set(failing)
         self._keys = 0
 
-    def __call__(self, cmd, *, input=None, check=True):
+    def __call__(self, cmd, *, input=None, check=True, env=None, capture=True):
         cmd = list(cmd)
         if cmd[0] in self.missing:
             raise ByteGuardError(f"`{cmd[0]}` is not installed.")
@@ -61,6 +61,7 @@ def temp_paths(testcase) -> Paths:
         launcher=root / "usr/local/bin/byteguard",
         backups=root / "var/backups/byteguard",
         ui_unit=root / "etc/systemd/system/byteguard-ui.service",
+        tunnel_unit=root / "etc/systemd/system/byteguard-tunnel.service",
     )
 
 
