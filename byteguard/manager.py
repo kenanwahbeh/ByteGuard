@@ -2,6 +2,7 @@
 
 import contextlib
 import datetime
+import ipaddress
 import shutil
 import tempfile
 
@@ -9,8 +10,7 @@ from byteguard import firewall, state, system, wg
 from byteguard.errors import ByteGuardError
 from byteguard.paths import INTERFACE, Paths
 
-SUBNET = "10.66.66.0/24"
-SERVER_ADDRESS = "10.66.66.1"
+DEFAULT_SUBNET = "10.66.66.0/24"
 MTU = 1420
 KEEPALIVE = 25
 DNS = ["1.1.1.1", "1.0.0.1"]
@@ -75,7 +75,8 @@ class Manager:
                 "Move it away first; ByteGuard will not overwrite another WireGuard setup."
             )
 
-    def set_up(self, *, iface: str, endpoint: str, port: int) -> None:
+    def set_up(self, *, iface: str, endpoint: str, port: int, subnet: str = DEFAULT_SUBNET) -> None:
+        network = check_subnet(subnet)
         with state.locked(self.paths.lock):
             self.check_can_set_up()
             private, public = wg.keypair(self.run)
@@ -87,8 +88,9 @@ class Manager:
                     "iface": iface,
                     "endpoint": endpoint,
                     "port": port,
-                    "subnet": SUBNET,
-                    "address": SERVER_ADDRESS,
+                    "subnet": str(network),
+                    # The server takes the first address; devices follow it.
+                    "address": str(next(network.hosts())),
                     "mtu": MTU,
                     "keepalive": KEEPALIVE,
                     "dns": DNS,
@@ -180,6 +182,17 @@ class Manager:
             handle.write(stripped)
             handle.flush()
             self.run(["wg", "syncconf", INTERFACE, handle.name])
+
+
+def check_subnet(subnet: str) -> ipaddress.IPv4Network:
+    """The VPN's own network: private IPv4 with room for the server and at least one device."""
+    try:
+        network = ipaddress.IPv4Network(subnet, strict=False)
+    except ValueError:
+        raise ByteGuardError(f"{subnet!r} is not an IPv4 network such as {DEFAULT_SUBNET}.") from None
+    if not network.is_private or network.prefixlen > 30:
+        raise ByteGuardError("The VPN network has to be a private range of /30 or larger.")
+    return network
 
 
 def _find(data: dict, name: str) -> dict:

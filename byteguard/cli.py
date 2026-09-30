@@ -6,7 +6,7 @@ import sys
 
 from byteguard import __version__, wizard
 from byteguard.errors import ByteGuardError
-from byteguard.manager import Manager
+from byteguard.manager import DEFAULT_SUBNET, Manager, check_subnet
 from byteguard.paths import INTERFACE
 from byteguard.prompt import Terminal, open_terminal
 
@@ -23,6 +23,11 @@ def build_parser() -> argparse.ArgumentParser:
     setup.add_argument("--iface", help="network card that faces the internet")
     setup.add_argument("--endpoint", help="public IP or host name devices connect to")
     setup.add_argument("--port", type=int, help=f"WireGuard UDP port (default {wizard.DEFAULT_PORT})")
+    setup.add_argument(
+        "--subnet",
+        default=DEFAULT_SUBNET,
+        help=f"private network for the VPN; the server takes its first address (default {DEFAULT_SUBNET})",
+    )
     setup.add_argument("--first-device", help=f"name of the first device (default {wizard.DEFAULT_DEVICE})")
     setup.add_argument(
         "--non-interactive",
@@ -85,6 +90,7 @@ def _no_command(parser, manager: Manager) -> int:
 
 def _setup(args, manager: Manager) -> None:
     manager.check_can_set_up()
+    check_subnet(args.subnet)
     answers = wizard.gather(
         run=manager.run,
         term=None if args.non_interactive else open_terminal(),
@@ -93,7 +99,7 @@ def _setup(args, manager: Manager) -> None:
         port=args.port,
         first_device=args.first_device,
     )
-    manager.set_up(iface=answers.iface, endpoint=answers.endpoint, port=answers.port)
+    manager.set_up(iface=answers.iface, endpoint=answers.endpoint, port=answers.port, subnet=args.subnet)
     print(f"The VPN server is running on {answers.endpoint}, UDP port {answers.port}.")
     manager.add_device(answers.first_device)
     _print_device(manager, answers.first_device, qr=True)
