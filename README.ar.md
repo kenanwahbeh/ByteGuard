@@ -21,7 +21,7 @@ ByteGuard ينصّب سيرفر WireGuard على جهازك بأمر واحد، 
 <div dir="ltr">
 
 ```bash
-curl -fsSL https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh -o byteguard.sh
+curl -fsSL https://bytebalancetech.com/byteguard.sh -o byteguard.sh
 sudo bash byteguard.sh
 ```
 
