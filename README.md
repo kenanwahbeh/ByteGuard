@@ -12,6 +12,10 @@ ByteGuard sets up a WireGuard VPN server on your own machine with one
 command, lets you manage its devices from a web page, and brings the whole
 setup back from a single backup file after a server reinstall.
 
+<p align="center">
+  <img src="assets/screenshots/devices-en.png" alt="The web interface: devices with their connection status and traffic" width="620">
+</p>
+
 ## Install
 
 On a fresh Ubuntu 22.04+ or Debian 12+ server:
@@ -99,7 +103,12 @@ The server's keys and the devices are stored in
 `sudo byteguard ui setup` asks for a password and turns the web interface
 on at `http://<server's VPN address>:51821`, for example
 `http://10.66.66.1:51821`. Open it from a device that is connected to the
-VPN; from anywhere else the address does not answer. The page is in
+VPN; from anywhere else the address does not answer.
+
+<p align="center">
+  <img src="assets/screenshots/web-en.png" alt="The whole web interface: devices, backups, Telegram and S3 storage" width="520">
+</p>
+ The page is in
 English or Arabic, and the button in the top corner switches between them.
 
 The interface runs as its own service with a read-only view of the system
