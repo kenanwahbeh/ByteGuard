@@ -21,11 +21,12 @@ setup back from a single backup file after a server reinstall.
 On a fresh Ubuntu 22.04+ or Debian 12+ server:
 
 ```bash
-curl -fsSL https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh -o byteguard.sh
+curl -fsSL https://bytebalancetech.com/byteguard.sh -o byteguard.sh
 sudo bash byteguard.sh
 ```
 
-Every release also carries `byteguard.sh.sha256`, and the program is
+The link leads to the latest release on GitHub, which also carries
+`byteguard.sh.sha256`, and the program is
 embedded in the installer as plain text, so you can read it before running
 it. Version 1, the old single-file script, stays available as release
 [v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0);
