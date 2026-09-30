@@ -129,6 +129,34 @@ class Manager:
         # one, depends on it.
         self.paths.sysctl.unlink(missing_ok=True)
 
+    def set_port(self, port: int) -> None:
+        """Move the VPN to another UDP port. Every device then needs its configuration again."""
+        if not 1 <= port <= 65535:
+            raise ByteGuardError("The port has to be between 1 and 65535.")
+        with state.locked(self.paths.lock):
+            data = self._state()
+            server, mode = data["server"], data["firewall"]["mode"]
+            old = server["port"]
+            if port == old:
+                return
+            # Stop first: PostDown has to run against the configuration that
+            # still names the old port.
+            self.run(["systemctl", "stop", SERVICE])
+            try:
+                self._move_port(data, old, port)
+            except BaseException:
+                self._move_port(data, port, old)
+                raise
+
+    def _move_port(self, data: dict, old: int, new: int) -> None:
+        server, mode = data["server"], data["firewall"]["mode"]
+        firewall.close_ports(self.run, mode, server["iface"], old)
+        server["port"] = new
+        firewall.open_ports(self.run, mode, server["iface"], new)
+        state.write_private(self.paths.wg_conf, wg.server_config(data))
+        state.save(self.paths.state, data)
+        self.run(["systemctl", "start", SERVICE])
+
     # Devices
 
     def add_device(self, name: str) -> dict:

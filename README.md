@@ -75,6 +75,7 @@ Afterwards, `sudo byteguard` opens a menu. The same actions are commands:
 | `sudo byteguard disable NAME` | Stop a device from connecting without deleting it |
 | `sudo byteguard enable NAME` | Let a disabled device connect again |
 | `sudo byteguard remove NAME` | Delete a device |
+| `sudo byteguard port NUMBER` | Move the VPN to another UDP port; every device then needs its configuration again |
 | `sudo byteguard uninstall` | Remove the VPN, its keys and ByteGuard |
 
 The server's keys and the devices are stored in

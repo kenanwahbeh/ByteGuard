@@ -60,6 +60,10 @@ def build_parser() -> argparse.ArgumentParser:
     remove.add_argument("name")
     remove.set_defaults(handler=_remove)
 
+    port = commands.add_parser("port", help="move the VPN to another UDP port")
+    port.add_argument("number", type=int)
+    port.set_defaults(handler=_port)
+
     uninstall = commands.add_parser("uninstall", help="remove the VPN, its keys and ByteGuard")
     uninstall.add_argument("--yes", action="store_true", help="do not ask for confirmation")
     uninstall.set_defaults(handler=_uninstall)
@@ -169,6 +173,12 @@ def _toggle(args, manager: Manager) -> None:
 def _remove(args, manager: Manager) -> None:
     manager.remove_device(args.name)
     print(f"{args.name} was removed.")
+
+
+def _port(args, manager: Manager) -> None:
+    manager.set_port(args.number)
+    print(f"The VPN now listens on UDP port {args.number}.")
+    print("Every device needs its configuration again: `sudo byteguard show <name>`.")
 
 
 def _uninstall(args, manager: Manager) -> None:

@@ -176,6 +176,43 @@ class DeviceTest(ManagerTestCase):
             self.manager().devices()
 
 
+class PortTest(ManagerTestCase):
+    def test_moving_the_port_swaps_the_firewall_rules_and_restarts_the_interface(self):
+        manager = self.set_up(outputs=UFW_ACTIVE)
+        manager.add_device("phone")
+
+        manager.set_port(51986)
+
+        self.assertEqual(manager.server()["port"], 51986)
+        self.assertIn("ListenPort = 51986", manager.paths.wg_conf.read_text())
+        self.assertIn("Endpoint = 203.0.113.7:51986", manager.client_config("phone"))
+        commands = [" ".join(call) for call in manager.run.calls]
+        stop = commands.index("systemctl stop wg-quick@wg0")
+        self.assertLess(stop, commands.index("ufw delete allow 51820/udp"))
+        self.assertLess(commands.index("ufw allow 51986/udp comment ByteGuard"),
+                        commands.index("systemctl start wg-quick@wg0"))
+
+    def test_a_port_that_fails_to_start_is_rolled_back(self):
+        manager = self.set_up(outputs=UFW_ACTIVE)
+        manager.run.failing.add("systemctl start wg-quick@wg0")
+
+        with self.assertRaises(ByteGuardError):
+            manager.set_port(51986)
+
+        self.assertEqual(manager.server()["port"], 51820)
+        self.assertIn("ListenPort = 51820", manager.paths.wg_conf.read_text())
+
+    def test_the_same_port_or_an_impossible_one_changes_nothing(self):
+        manager = self.set_up()
+        before = len(manager.run.calls)
+
+        manager.set_port(51820)
+        with self.assertRaises(ByteGuardError):
+            manager.set_port(70000)
+
+        self.assertEqual(len(manager.run.calls), before)
+
+
 class StatusTest(ManagerTestCase):
     def test_live_figures_are_matched_to_devices_by_public_key(self):
         manager = self.set_up()
