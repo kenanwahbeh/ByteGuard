@@ -102,8 +102,9 @@ VPN; from anywhere else the address does not answer. The page is in
 English or Arabic, and the button in the top corner switches between them.
 
 The interface runs as its own service with a read-only view of the system
-apart from ByteGuard's files. Eight wrong passwords lock sign-in for five
-minutes. Running `ui setup` again changes the password and signs everyone
+apart from ByteGuard's files. Eight wrong passwords from the same address
+lock sign-in from that address for five minutes; other addresses, yours
+included, are not affected. Running `ui setup` again changes the password and signs everyone
 out.
 
 ### On your own domain

@@ -92,6 +92,8 @@ def create(run, home: Path, hostname: str) -> dict:
         created = json.loads(credentials.read_text())
         routed = run(["cloudflared", "tunnel", "route", "dns", created["TunnelID"], hostname], env=env, check=False)
         if routed.returncode != 0:
+            # Do not leave a tunnel behind that nothing will ever run.
+            run(["cloudflared", "tunnel", "delete", created["TunnelID"]], env=env, check=False)
             detail = (routed.stderr or routed.stdout).strip().splitlines()[-1:]
             raise ByteGuardError(
                 f"Cloudflare would not point {hostname} at the tunnel: {' '.join(detail)} "

@@ -157,17 +157,32 @@ class Handler(BaseHTTPRequestHandler):
 
     def _login(self) -> None:
         sessions = self.app.sessions
-        if sessions.locked_out():
+        client = self._client()
+        if sessions.locked_out(client):
             raise Problem(HTTPStatus.TOO_MANY_REQUESTS, "locked")
         stored = self.app.manager.ui()
         if stored is None or not auth.verify_password(self._text(self._body(), "password"), stored["password"]):
-            sessions.record_failure()
+            sessions.record_failure(client)
             raise Problem(HTTPStatus.UNAUTHORIZED, "password")
         cookie = f"{COOKIE}={sessions.start()}; Path=/; HttpOnly; SameSite=Strict; Max-Age={auth.SESSION_SECONDS}"
         if self.headers.get("X-Forwarded-Proto") == "https":
             # Reached through the tunnel: never send the cookie over plain HTTP.
             cookie += "; Secure"
         self._json({"ok": True}, headers={"Set-Cookie": cookie})
+
+    def _client(self) -> str:
+        """Who is signing in, for counting wrong passwords.
+
+        Through the tunnel every request arrives from cloudflared on this same
+        address, so there the visitor's address comes from Cloudflare's
+        header. Devices in the VPN connect from their own addresses and
+        cannot pose as the tunnel.
+        """
+        peer = self.client_address[0]
+        forwarded = self.headers.get("CF-Connecting-IP")
+        if forwarded and peer == self.server.server_address[0]:
+            return forwarded
+        return peer
 
     def _logout(self) -> None:
         self.app.sessions.end(self._session())

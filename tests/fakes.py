@@ -13,8 +13,10 @@ from byteguard.prompt import Terminal
 class FakeRun:
     """Records every command and answers the ones ByteGuard reads output from."""
 
-    def __init__(self, *, interface_up=True, outputs=None, failing=(), missing=()):
+    def __init__(self, *, interface_up=True, outputs=None, failing=(), missing=(), active=()):
         self.calls = []
+        # Services that `systemctl is-active` reports as running.
+        self.active = set(active)
         self.missing = set(missing)
         self.interface_up = interface_up
         self.outputs = dict(outputs or {})
@@ -38,6 +40,8 @@ class FakeRun:
             out = f"psk-{self._keys}\n"
         elif cmd == ["wg", "show", "wg0"] and not self.interface_up:
             code = 1
+        elif cmd[:3] == ["systemctl", "is-active", "--quiet"]:
+            code = 0 if cmd[3] in self.active else 3
         if joined in self.failing:
             code = 1
         if check and code:

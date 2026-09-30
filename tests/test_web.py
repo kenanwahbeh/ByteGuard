@@ -56,13 +56,19 @@ class SessionsTest(unittest.TestCase):
 
     def test_repeated_failures_lock_logins_until_the_window_passes(self):
         for _ in range(auth.MAX_FAILURES):
-            self.assertFalse(self.sessions.locked_out())
-            self.sessions.record_failure()
-        self.assertTrue(self.sessions.locked_out())
+            self.assertFalse(self.sessions.locked_out("198.51.100.9"))
+            self.sessions.record_failure("198.51.100.9")
+        self.assertTrue(self.sessions.locked_out("198.51.100.9"))
 
         self.clock.now += auth.FAILURE_WINDOW_SECONDS + 1
 
-        self.assertFalse(self.sessions.locked_out())
+        self.assertFalse(self.sessions.locked_out("198.51.100.9"))
+
+    def test_one_clients_failures_never_lock_out_another(self):
+        for _ in range(auth.MAX_FAILURES):
+            self.sessions.record_failure("198.51.100.9")
+
+        self.assertFalse(self.sessions.locked_out("203.0.113.50"))
 
 
 class WebTestCase(unittest.TestCase):
@@ -128,6 +134,16 @@ class LoginTest(WebTestCase):
 
         self.assertNotIn("Secure", direct.headers["Set-Cookie"])
         self.assertIn("; Secure", tunnelled.headers["Set-Cookie"])
+
+    def test_a_stranger_guessing_through_the_tunnel_does_not_lock_the_owner_out(self):
+        stranger = {"CF-Connecting-IP": "198.51.100.9"}
+        for _ in range(auth.MAX_FAILURES):
+            self.request("POST", "/api/login", {"password": "wrong"}, headers=stranger)
+
+        blocked, _ = self.request("POST", "/api/login", {"password": PASSWORD}, headers=stranger)
+        owner, _ = self.request("POST", "/api/login", {"password": PASSWORD}, headers={"CF-Connecting-IP": "203.0.113.50"})
+
+        self.assertEqual((blocked.status, owner.status), (429, 200))
 
     def test_guessing_is_cut_off_even_for_the_right_password(self):
         for _ in range(auth.MAX_FAILURES):
