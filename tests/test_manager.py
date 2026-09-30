@@ -90,7 +90,9 @@ class DeviceTest(ManagerTestCase):
         manager.add_device("phone")
 
         self.assertEqual(manager.run.ran("wg-quick"), [f"wg-quick strip {manager.paths.wg_conf}"])
-        self.assertEqual(len(manager.run.ran("wg syncconf wg0 ")), 1)
+        (synced,) = manager.run.ran("wg syncconf wg0 ")
+        # AppArmor confines `wg` to /etc/wireguard, so the file has to be there.
+        self.assertTrue(synced.startswith(f"wg syncconf wg0 {manager.paths.wireguard}/"), synced)
         self.assertEqual(manager.run.ran("systemctl"), ["systemctl enable --now wg-quick@wg0"])
 
     def test_with_the_interface_down_the_change_waits_in_the_config_file(self):

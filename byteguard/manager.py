@@ -175,7 +175,8 @@ class Manager:
             # The interface is down; it reads the file when it next starts.
             return
         stripped = self.run(["wg-quick", "strip", str(self.paths.wg_conf)]).stdout
-        with tempfile.NamedTemporaryFile("w", dir=self.paths.etc, prefix=".sync-") as handle:
+        # Ubuntu's AppArmor profile lets `wg` read files under /etc/wireguard only.
+        with tempfile.NamedTemporaryFile("w", dir=self.paths.wireguard, prefix=".sync-") as handle:
             handle.write(stripped)
             handle.flush()
             self.run(["wg", "syncconf", INTERFACE, handle.name])
