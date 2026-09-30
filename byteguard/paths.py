@@ -1,0 +1,27 @@
+"""Where ByteGuard keeps its files. Tests point these at a temporary directory."""
+
+from dataclasses import dataclass
+from pathlib import Path
+
+INTERFACE = "wg0"
+
+
+@dataclass(frozen=True)
+class Paths:
+    etc: Path = Path("/etc/byteguard")
+    wireguard: Path = Path("/etc/wireguard")
+    sysctl: Path = Path("/etc/sysctl.d/99-byteguard.conf")
+    program: Path = Path("/opt/byteguard")
+    launcher: Path = Path("/usr/local/bin/byteguard")
+
+    @property
+    def state(self) -> Path:
+        return self.etc / "state.json"
+
+    @property
+    def lock(self) -> Path:
+        return self.etc / "state.lock"
+
+    @property
+    def wg_conf(self) -> Path:
+        return self.wireguard / f"{INTERFACE}.conf"

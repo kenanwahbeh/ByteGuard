@@ -1,0 +1,188 @@
+"""Everything ByteGuard can do to the server. The terminal and the web interface both call this."""
+
+import contextlib
+import datetime
+import shutil
+import tempfile
+
+from byteguard import firewall, state, system, wg
+from byteguard.errors import ByteGuardError
+from byteguard.paths import INTERFACE, Paths
+
+SUBNET = "10.66.66.0/24"
+SERVER_ADDRESS = "10.66.66.1"
+MTU = 1420
+KEEPALIVE = 25
+DNS = ["1.1.1.1", "1.0.0.1"]
+
+SERVICE = f"wg-quick@{INTERFACE}"
+
+
+class Manager:
+    def __init__(self, paths: Paths | None = None, run=system.run):
+        self.paths = paths or Paths()
+        self.run = run
+
+    # Reading
+
+    def is_set_up(self) -> bool:
+        return state.load(self.paths.state) is not None
+
+    def _state(self) -> dict:
+        data = state.load(self.paths.state)
+        if data is None:
+            raise ByteGuardError("This server is not set up yet. Run `sudo byteguard setup`.")
+        return data
+
+    def server(self) -> dict:
+        return self._state()["server"]
+
+    def devices(self) -> list[dict]:
+        return self._state()["devices"]
+
+    def client_config(self, name: str) -> str:
+        data = self._state()
+        return wg.client_config(data, _find(data, name))
+
+    def qr_code(self, name: str) -> str:
+        """The device's configuration as a QR code drawn with terminal characters."""
+        return self.run(["qrencode", "-t", "ansiutf8"], input=self.client_config(name)).stdout
+
+    def status(self) -> list[dict]:
+        """Every device with its live connection figures, which reset when the interface restarts."""
+        data = self._state()
+        dump = self.run(["wg", "show", INTERFACE, "dump"], check=False)
+        live = wg.parse_dump(dump.stdout) if dump.returncode == 0 else {}
+        idle = {"endpoint": None, "last_handshake": None, "online": False, "received": 0, "sent": 0}
+        return [
+            {
+                "name": device["name"],
+                "address": device["address"],
+                "enabled": device["enabled"],
+                **live.get(device["public_key"], idle),
+            }
+            for device in data["devices"]
+        ]
+
+    # Setting up and removing
+
+    def check_can_set_up(self) -> None:
+        if self.is_set_up():
+            raise ByteGuardError("This server is already set up. Run `sudo byteguard` to manage it.")
+        if self.paths.wg_conf.exists():
+            raise ByteGuardError(
+                f"{self.paths.wg_conf} already exists and was not created by ByteGuard. "
+                "Move it away first; ByteGuard will not overwrite another WireGuard setup."
+            )
+
+    def set_up(self, *, iface: str, endpoint: str, port: int) -> None:
+        with state.locked(self.paths.lock):
+            self.check_can_set_up()
+            private, public = wg.keypair(self.run)
+            data = {
+                "schema": state.SCHEMA,
+                "server": {
+                    "private_key": private,
+                    "public_key": public,
+                    "iface": iface,
+                    "endpoint": endpoint,
+                    "port": port,
+                    "subnet": SUBNET,
+                    "address": SERVER_ADDRESS,
+                    "mtu": MTU,
+                    "keepalive": KEEPALIVE,
+                    "dns": DNS,
+                },
+                "firewall": {"mode": firewall.detect(self.run)},
+                "devices": [],
+            }
+            try:
+                firewall.enable_forwarding(self.paths.sysctl, self.run)
+                firewall.open_ports(self.run, data["firewall"]["mode"], iface, port)
+                state.write_private(self.paths.wg_conf, wg.server_config(data))
+                self.run(["systemctl", "enable", "--now", SERVICE])
+            except BaseException:
+                # Leave the server as it was found, so setup can simply be run again.
+                self._tear_down(data)
+                raise
+            state.save(self.paths.state, data)
+
+    def uninstall(self) -> None:
+        """Remove the VPN, its firewall rules, its keys and the program itself."""
+        with state.locked(self.paths.lock):
+            data = state.load(self.paths.state)
+            if data is not None:
+                self._tear_down(data)
+        shutil.rmtree(self.paths.etc, ignore_errors=True)
+        shutil.rmtree(self.paths.program, ignore_errors=True)
+        self.paths.launcher.unlink(missing_ok=True)
+
+    def _tear_down(self, data: dict) -> None:
+        server = data["server"]
+        # Stopping the interface runs PostDown, which removes its iptables rules.
+        self.run(["systemctl", "disable", "--now", SERVICE], check=False)
+        firewall.close_ports(self.run, data["firewall"]["mode"], server["iface"], server["port"])
+        self.paths.wg_conf.unlink(missing_ok=True)
+        # Forwarding itself stays on: other software on the host, Docker for
+        # one, depends on it.
+        self.paths.sysctl.unlink(missing_ok=True)
+
+    # Devices
+
+    def add_device(self, name: str) -> dict:
+        wg.check_name(name)
+        with self._changing() as data:
+            if any(device["name"] == name for device in data["devices"]):
+                raise ByteGuardError(f"A device named {name!r} already exists.")
+            private, public = wg.keypair(self.run)
+            device = {
+                "name": name,
+                "private_key": private,
+                "public_key": public,
+                "preshared_key": wg.preshared_key(self.run),
+                "address": wg.next_address(
+                    data["server"]["subnet"],
+                    data["server"]["address"],
+                    (other["address"] for other in data["devices"]),
+                ),
+                "enabled": True,
+                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+            }
+            data["devices"].append(device)
+        return device
+
+    def remove_device(self, name: str) -> None:
+        with self._changing() as data:
+            data["devices"].remove(_find(data, name))
+
+    def set_enabled(self, name: str, enabled: bool) -> None:
+        with self._changing() as data:
+            _find(data, name)["enabled"] = enabled
+
+    @contextlib.contextmanager
+    def _changing(self):
+        """Load the state for a change, then save it and apply it to the running interface."""
+        with state.locked(self.paths.lock):
+            data = self._state()
+            yield data
+            state.save(self.paths.state, data)
+            state.write_private(self.paths.wg_conf, wg.server_config(data))
+            self._sync()
+
+    def _sync(self) -> None:
+        """Apply the configuration file to the running interface without dropping connections."""
+        if self.run(["wg", "show", INTERFACE], check=False).returncode != 0:
+            # The interface is down; it reads the file when it next starts.
+            return
+        stripped = self.run(["wg-quick", "strip", str(self.paths.wg_conf)]).stdout
+        with tempfile.NamedTemporaryFile("w", dir=self.paths.etc, prefix=".sync-") as handle:
+            handle.write(stripped)
+            handle.flush()
+            self.run(["wg", "syncconf", INTERFACE, handle.name])
+
+
+def _find(data: dict, name: str) -> dict:
+    for device in data["devices"]:
+        if device["name"] == name:
+            return device
+    raise ByteGuardError(f"There is no device named {name!r}.")
