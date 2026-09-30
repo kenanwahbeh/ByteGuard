@@ -59,6 +59,7 @@ def temp_paths(testcase) -> Paths:
         sysctl=root / "etc/sysctl.d/99-byteguard.conf",
         program=root / "opt/byteguard",
         launcher=root / "usr/local/bin/byteguard",
+        backups=root / "var/backups/byteguard",
     )
 
 

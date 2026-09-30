@@ -9,6 +9,8 @@ import re
 from pathlib import Path
 
 PAYLOAD_MARK = "# @@BYTEGUARD_PAYLOAD@@"
+DATA_MARK = "# @@BYTEGUARD_DATA@@"
+DATA_DELIMITER = "__BYTEGUARD_DATA_EOF__"
 VERSION_MARK = "@@BYTEGUARD_VERSION@@"
 DELIMITER = "__BYTEGUARD_PAYLOAD_EOF__"
 TEMPLATE = "bootstrap.sh"
@@ -26,12 +28,31 @@ def package_files(package_dir: Path) -> dict[str, str]:
     return files
 
 
-def build_installer(files: dict[str, str], version: str) -> str:
-    """Return the installer script for these program files."""
+def build_installer(files: dict[str, str], version: str, data: str | None = None) -> str:
+    """Return the installer script for these program files.
+
+    With `data`, the script is a backup: it also carries that text and
+    restores it on the server it is run on.
+    """
     template = files[f"byteguard/{TEMPLATE}"]
-    if template.count(PAYLOAD_MARK) != 1:
-        raise ValueError(f"{TEMPLATE} must contain the payload marker exactly once")
-    return template.replace(VERSION_MARK, version).replace(PAYLOAD_MARK, _extract_function(files))
+    for mark in (PAYLOAD_MARK, DATA_MARK):
+        if template.count(mark) != 1:
+            raise ValueError(f"{TEMPLATE} must contain {mark} exactly once")
+    # One pass, so a marker inside an embedded file is never replaced.
+    parts = {
+        VERSION_MARK: version,
+        PAYLOAD_MARK: _extract_function(files),
+        DATA_MARK: "" if data is None else _data_function(data),
+    }
+    return re.sub("|".join(map(re.escape, parts)), lambda match: parts[match.group()], template)
+
+
+def _data_function(data: str) -> str:
+    if DATA_DELIMITER in data.splitlines():
+        raise ValueError("the backup data contains the heredoc delimiter on a line of its own")
+    if not data.endswith("\n"):
+        data += "\n"
+    return f"restore_data() {{\n  cat >\"$1\" <<'{DATA_DELIMITER}'\n{data}{DATA_DELIMITER}\n}}"
 
 
 def _extract_function(files: dict[str, str]) -> str:

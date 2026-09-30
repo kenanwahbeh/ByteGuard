@@ -1,8 +1,10 @@
 import contextlib
 import io
+import json
 import unittest
+from unittest import mock
 
-from byteguard import __version__
+from byteguard import __version__, state
 from byteguard.cli import main
 from byteguard.manager import Manager
 from fakes import FakeRun, temp_paths
@@ -119,6 +121,62 @@ class SetupCommandTest(CliTestCase):
 
         self.assertEqual(code, 1)
         self.assertIn("already set up", err)
+
+
+class BackupCommandTest(CliTestCase):
+    NETWORK = {
+        "ip -4 route show default": "default via 203.0.113.1 dev ens3\n",
+        "ip -4 -o addr show scope global": "2: ens3    inet 203.0.113.7/26 scope global ens3\\\n",
+    }
+
+    def payload_file(self):
+        """Backup data as a backup script would hand it to `byteguard restore`."""
+        self.set_up()
+        self.manager.add_device("phone")
+        path = self.manager.paths.etc.parent / "payload.json"
+        payload = {"made_at": "2026-09-30T12:00:00+00:00", "host": "old", "state": state.load(self.manager.paths.state)}
+        path.write_text(json.dumps(payload))
+        return path
+
+    def fresh_server(self, **outputs):
+        self.manager = Manager(temp_paths(self), FakeRun(outputs={**self.NETWORK, **outputs}))
+
+    def test_backup_says_where_the_file_is_and_that_it_is_not_encrypted(self):
+        self.set_up()
+
+        code, out, _ = self.run_cli("backup")
+
+        self.assertEqual(code, 0)
+        self.assertIn(str(self.manager.paths.backups), out)
+        self.assertIn("not encrypted", out)
+
+    def test_restore_brings_the_devices_back_on_a_fresh_server(self):
+        path = self.payload_file()
+        self.fresh_server()
+
+        code, out, err = self.run_cli("restore", str(path), "--yes")
+
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual([device["name"] for device in self.manager.devices()], ["phone"])
+        self.assertEqual(self.manager.server()["iface"], "ens3")
+        self.assertNotIn("warning", out)
+
+    def test_restore_warns_when_the_devices_point_at_another_address(self):
+        path = self.payload_file()
+        self.fresh_server(**{"ip -4 -o addr show scope global": "2: ens3    inet 198.51.100.9/26 scope global ens3\\\n"})
+
+        with mock.patch("byteguard.netdetect.public_address", return_value="198.51.100.9"):
+            _, out, _ = self.run_cli("restore", str(path), "--yes")
+
+        self.assertIn("warning: the devices connect to 203.0.113.7", out)
+
+    def test_restore_with_a_new_endpoint_rewrites_the_device_settings(self):
+        path = self.payload_file()
+        self.fresh_server()
+
+        self.run_cli("restore", str(path), "--yes", "--endpoint", "vpn.example.com")
+
+        self.assertIn("Endpoint = vpn.example.com:51820", self.manager.client_config("phone"))
 
 
 class UninstallCommandTest(CliTestCase):

@@ -107,6 +107,18 @@ bash "$INSTALLER" --non-interactive
 byteguard list | grep -E '^laptop ' >/dev/null || fail "reinstalling lost a device"
 reaches_server || fail "reinstalling dropped the connection"
 
+step "Back up, wipe the server and restore from the backup file"
+byteguard backup
+backup_copy="$(mktemp)"
+cp /var/backups/byteguard/byteguard-backup-*.sh "$backup_copy"
+byteguard uninstall --yes
+ip link show wg0 >/dev/null 2>&1 && fail "wg0 survived the uninstall before the restore"
+bash "$backup_copy" --yes
+rm -f "$backup_copy"
+[[ "$(wg show wg0 public-key)" == "$server_key" ]] || fail "the restored server has a different key"
+byteguard list | grep -E '^laptop ' >/dev/null || fail "the restore lost a device"
+reaches_server || fail "a device cannot reconnect to the restored server without new settings"
+
 step "Uninstall"
 byteguard uninstall --yes
 ip link show wg0 >/dev/null 2>&1 && fail "wg0 still exists"

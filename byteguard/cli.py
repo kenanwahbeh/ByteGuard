@@ -2,9 +2,11 @@
 
 import argparse
 import datetime
+import ipaddress
 import sys
+from pathlib import Path
 
-from byteguard import __version__, wizard
+from byteguard import __version__, backup, netdetect, telegram, wizard
 from byteguard.errors import ByteGuardError
 from byteguard.manager import DEFAULT_SUBNET, Manager, check_subnet
 from byteguard.paths import INTERFACE
@@ -64,6 +66,22 @@ def build_parser() -> argparse.ArgumentParser:
     port.add_argument("number", type=int)
     port.set_defaults(handler=_port)
 
+    back_up = commands.add_parser(
+        "backup",
+        help="make a backup now; `backup telegram` sends every backup to a Telegram chat",
+    )
+    back_up.add_argument("destination", nargs="?", choices=["telegram"])
+    back_up.add_argument("--off", action="store_true", help="stop sending backups to the destination")
+    back_up.set_defaults(handler=_backup)
+
+    # Run by a backup file on the server it is restoring.
+    restore = commands.add_parser("restore", help=argparse.SUPPRESS)
+    restore.add_argument("file", type=Path)
+    restore.add_argument("--iface")
+    restore.add_argument("--endpoint")
+    restore.add_argument("--yes", action="store_true")
+    restore.set_defaults(handler=_restore)
+
     uninstall = commands.add_parser("uninstall", help="remove the VPN, its keys and ByteGuard")
     uninstall.add_argument("--yes", action="store_true", help="do not ask for confirmation")
     uninstall.set_defaults(handler=_uninstall)
@@ -77,12 +95,21 @@ def main(argv: list[str] | None = None, manager: Manager | None = None) -> int:
     try:
         if args.command is None:
             return _no_command(parser, manager)
-        return args.handler(args, manager) or 0
+        code = args.handler(args, manager) or 0
+        _warn_about_backup(manager)
+        return code
     except ByteGuardError as error:
         print(f"error: {error}", file=sys.stderr)
     except PermissionError:
         print("error: permission denied. Run this with sudo.", file=sys.stderr)
     return 1
+
+
+def _warn_about_backup(manager: Manager) -> None:
+    """Say so when the backup that follows a change did not reach a destination."""
+    for destination, result in manager.last_backup.items():
+        if not result["ok"]:
+            print(f"warning: the {destination} backup failed: {result['error']}", file=sys.stderr)
 
 
 def _no_command(parser, manager: Manager) -> int:
@@ -181,6 +208,74 @@ def _port(args, manager: Manager) -> None:
     print("Every device needs its configuration again: `sudo byteguard show <name>`.")
 
 
+def _backup(args, manager: Manager) -> None:
+    if args.destination is None:
+        results = manager.back_up()
+        if results["local"]["ok"]:
+            print(f"Backup written to {results['local']['path']}")
+        if results.get("telegram", {}).get("ok"):
+            print("Backup sent to Telegram.")
+        print("The backup is not encrypted and holds every key. Keep it private.")
+    elif args.off:
+        manager.set_telegram(None)
+        print("Backups are no longer sent to Telegram.")
+    else:
+        _connect_telegram(manager, open_terminal())
+
+
+def _connect_telegram(manager: Manager, term: Terminal) -> None:
+    manager.server()
+    term.say("Create a bot with @BotFather in Telegram (/newbot) and paste its token here.")
+    token = term.ask("Bot token")
+    name = telegram.bot_name(token)
+    term.say(f"Now open Telegram and send any message to @{name}.")
+    term.ask("Press Enter once it is sent", "done")
+    chat = telegram.latest_chat(token)
+    if chat is None:
+        raise ByteGuardError(f"@{name} has not received a message yet. Send it one and run this again.")
+    chat_id, who = chat
+    if not term.confirm(f"Send every backup to {who}? It holds all the keys, unencrypted"):
+        raise ByteGuardError("Nothing was changed.")
+    manager.set_telegram(token, chat_id)
+    if manager.last_backup.get("telegram", {}).get("ok"):
+        term.say(f"Done. A backup was just sent to {who}, and one will follow every change.")
+
+
+def _restore(args, manager: Manager) -> None:
+    manager.check_can_set_up()
+    payload = backup.read_payload(args.file)
+    saved = payload["state"]
+    cards = netdetect.interfaces(manager.run)
+    iface = args.iface or (saved["server"]["iface"] if saved["server"]["iface"] in cards else None)
+    iface = iface or netdetect.default_interface(manager.run)
+    if iface not in cards:
+        raise ByteGuardError("Could not tell which network card faces the internet; pass --iface.")
+    endpoint = args.endpoint or saved["server"]["endpoint"]
+
+    count = len(saved["devices"])
+    print(f"Backup of {payload['host']}, made {payload['made_at']}: {count} device{'s' if count != 1 else ''}.")
+    print(f"It will be restored on network card {iface} ({cards[iface]}), UDP port {saved['server']['port']}.")
+    moved = _moved(endpoint, cards)
+    if moved:
+        print(f"warning: the devices connect to {endpoint}, which is not this server's address.")
+        print("They will not reach it unless that address is moved here. To restore with a")
+        print("new address, pass --endpoint; every device then needs its configuration again.")
+    if not args.yes and not open_terminal().confirm("Restore it on this server?"):
+        raise ByteGuardError("Nothing was restored.")
+    manager.restore(saved, iface=iface, endpoint=endpoint)
+    print("Restored. The VPN is running with the same keys, so devices reconnect on their own.")
+
+
+def _moved(endpoint: str, cards: dict[str, str]) -> bool:
+    """True when the endpoint is an IP address that this server does not have."""
+    try:
+        ipaddress.ip_address(endpoint)
+    except ValueError:
+        # A host name: its DNS record decides where it points.
+        return False
+    return endpoint not in cards.values() and endpoint != netdetect.public_address()
+
+
 def _uninstall(args, manager: Manager) -> None:
     if not args.yes:
         term = open_terminal()
@@ -190,6 +285,8 @@ def _uninstall(args, manager: Manager) -> None:
             raise ByteGuardError("Nothing was removed.")
     manager.uninstall()
     print("ByteGuard was removed from this server.")
+    if manager.paths.backups.exists():
+        print(f"The last backup was kept in {manager.paths.backups}. It holds every key.")
 
 
 def _menu(manager: Manager, term: Terminal) -> int:
@@ -199,6 +296,7 @@ def _menu(manager: Manager, term: Terminal) -> int:
         ("Show a device's configuration and QR code", _menu_show),
         ("Enable or disable a device", _menu_toggle),
         ("Remove a device", _menu_remove),
+        ("Make a backup now", _menu_backup),
         ("Quit", None),
     ]
     while True:
@@ -250,6 +348,12 @@ def _menu_toggle(manager: Manager, term: Terminal) -> None:
     if device:
         manager.set_enabled(device["name"], not device["enabled"])
         term.say(f"{device['name']} is now {'disabled' if device['enabled'] else 'enabled'}.")
+
+
+def _menu_backup(manager: Manager, term: Terminal) -> None:
+    results = manager.back_up()
+    for destination, result in results.items():
+        term.say(f"{destination}: {result.get('path', 'sent') if result['ok'] else 'failed: ' + result['error']}")
 
 
 def _menu_remove(manager: Manager, term: Terminal) -> None:
