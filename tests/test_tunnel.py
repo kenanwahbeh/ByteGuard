@@ -75,6 +75,8 @@ class CreateTest(unittest.TestCase):
             tunnel.create(run, self.home, "vpn.example.com")
 
         self.assertFalse(self.home.exists())
+        # The unused tunnel is deleted while the sign-in still allows it.
+        self.assertEqual(run.ran("cloudflared tunnel delete"), ["cloudflared tunnel delete 1234-abcd"])
 
     def test_a_cancelled_sign_in_leaves_nothing_behind(self):
         run = CloudflaredRun(failing={"cloudflared tunnel login"})
@@ -92,8 +94,8 @@ class DetectionTest(unittest.TestCase):
         self.assertTrue(tunnel.installed(FakeRun()))
 
     def test_an_active_cloudflared_service_is_someone_elses_tunnel(self):
-        self.assertTrue(tunnel.other_tunnel_running(FakeRun()))
-        self.assertFalse(tunnel.other_tunnel_running(FakeRun(failing={"systemctl is-active --quiet cloudflared"})))
+        self.assertTrue(tunnel.other_tunnel_running(FakeRun(active={"cloudflared"})))
+        self.assertFalse(tunnel.other_tunnel_running(FakeRun()))
 
     def test_an_unknown_architecture_is_not_downloaded_blindly(self):
         run = FakeRun(outputs={"dpkg --print-architecture": "riscv64\n"})
@@ -157,6 +159,45 @@ class ManagerTunnelTest(unittest.TestCase):
 
         self.assertIsNone(manager.tunnel())
         self.assertFalse(manager.paths.tunnel_unit.exists())
+
+    def test_a_tunnel_that_will_not_stop_is_kept_and_reported(self):
+        manager = self.with_tunnel()
+        manager.run.active.add("byteguard-tunnel")
+
+        with self.assertRaisesRegex(ByteGuardError, "still public"):
+            manager.disable_tunnel()
+
+        self.assertIsNotNone(manager.tunnel())
+        self.assertTrue(manager.paths.tunnel_unit.exists())
+
+    def test_a_tunnel_that_fails_to_start_keeps_its_credentials(self):
+        manager = self.manager()
+        manager.enable_ui("correct horse")
+        manager.run.failing.add("systemctl restart byteguard-tunnel")
+
+        with self.assertRaisesRegex(ByteGuardError, "created and saved"):
+            manager.enable_tunnel("vpn.example.com", CREATED)
+
+        self.assertEqual(manager.tunnel()["credentials"]["TunnelSecret"], "s3cret")
+
+    def test_changing_the_web_interface_port_moves_the_tunnel_with_it(self):
+        manager = self.with_tunnel()
+
+        manager.enable_ui("correct horse", port=52000)
+
+        config = (manager.paths.tunnel_dir / "config.yml").read_text()
+        self.assertIn("service: http://10.66.66.1:52000", config)
+
+    def test_a_tunnel_that_fails_during_a_restore_leaves_the_vpn_restored(self):
+        saved = self.with_tunnel().state_for_backup()
+        fresh = Manager(temp_paths(self), FakeRun(outputs={"sh -c command -v cloudflared": "/usr/bin/cloudflared\n"},
+                                                  failing={"systemctl restart byteguard-tunnel"}))
+
+        fresh.restore(saved, iface="eth0")
+
+        self.assertTrue(fresh.is_set_up())
+        self.assertIn("systemctl enable --now wg-quick@wg0", fresh.run.ran("systemctl"))
+        self.assertTrue(any("tunnel did not start" in warning for warning in fresh.warnings))
 
     def test_a_restore_brings_the_tunnel_back_without_signing_in_again(self):
         saved = self.with_tunnel().state_for_backup()

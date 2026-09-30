@@ -38,15 +38,23 @@ class Sessions:
     def __init__(self, clock=time.monotonic):
         self._clock = clock
         self._sessions: dict[str, float] = {}
-        self._failures: list[float] = []
+        # Wrong passwords per client, so a stranger's guesses never lock the owner out.
+        self._failures: dict[str, list[float]] = {}
 
-    def locked_out(self) -> bool:
+    def _recent(self, client: str) -> list[float]:
         cutoff = self._clock() - FAILURE_WINDOW_SECONDS
-        self._failures = [moment for moment in self._failures if moment > cutoff]
-        return len(self._failures) >= MAX_FAILURES
+        recent = [moment for moment in self._failures.get(client, []) if moment > cutoff]
+        if recent:
+            self._failures[client] = recent
+        else:
+            self._failures.pop(client, None)
+        return recent
 
-    def record_failure(self) -> None:
-        self._failures.append(self._clock())
+    def locked_out(self, client: str) -> bool:
+        return len(self._recent(client)) >= MAX_FAILURES
+
+    def record_failure(self, client: str) -> None:
+        self._failures[client] = [*self._recent(client), self._clock()]
 
     def start(self) -> str:
         token = secrets.token_urlsafe(32)

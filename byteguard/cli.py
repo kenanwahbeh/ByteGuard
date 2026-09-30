@@ -122,6 +122,8 @@ def main(argv: list[str] | None = None, manager: Manager | None = None) -> int:
 
 def _warn_about_backup(manager: Manager) -> None:
     """Say so when the backup that follows a change did not reach a destination."""
+    for warning in manager.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
     for destination, result in manager.last_backup.items():
         if not result["ok"]:
             print(f"warning: the {destination} backup failed: {result['error']}", file=sys.stderr)

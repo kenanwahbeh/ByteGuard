@@ -84,6 +84,8 @@ class Manager:
         self.send = send
         # What the backup after the latest change did, per destination.
         self.last_backup: dict = {}
+        # Problems that did not stop an operation but the user should hear about.
+        self.warnings: list[str] = []
 
     def _save(self, data: dict) -> None:
         """Save the state, then back it up. A failed backup never undoes the change."""
@@ -155,6 +157,9 @@ class Manager:
                 firewall.close_ui(self.run, data["firewall"]["mode"], previous["port"])
             data["ui"] = {"port": port, "password": auth.hash_password(password)}
             self._start_ui(data)
+            if "tunnel" in data and previous and previous["port"] != port:
+                # The tunnel forwards to the port; point it at the new one.
+                self._start_tunnel(data, f"http://{data['server']['address']}:{port}")
             self._save(data)
             return f"http://{data['server']['address']}:{port}"
 
@@ -181,13 +186,23 @@ class Manager:
 
     def enable_tunnel(self, hostname: str, created: dict) -> str:
         """Serve the web interface at https://hostname through the tunnel just created."""
-        target = self.ui_target()
         with state.locked(self.paths.lock):
             data = self._state()
+            if "ui" not in data:
+                raise ByteGuardError("The web interface is off. Turn it on first with `sudo byteguard ui setup`.")
+            target = f"http://{data['server']['address']}:{data['ui']['port']}"
             self._stop_tunnel(data)
             data["tunnel"] = {"hostname": hostname, **created}
-            self._start_tunnel(data, target)
+            # Saved before starting, so the new tunnel's credentials are never
+            # lost: a failed start can be retried with systemctl.
             self._save(data)
+            try:
+                self._start_tunnel(data, target)
+            except ByteGuardError as error:
+                raise ByteGuardError(
+                    f"The tunnel was created and saved but did not start: {error} "
+                    "Try `sudo systemctl restart byteguard-tunnel`."
+                ) from None
         return f"https://{hostname}"
 
     def disable_tunnel(self) -> None:
@@ -215,6 +230,12 @@ class Manager:
         if "tunnel" not in data:
             return
         self.run(["systemctl", "disable", "--now", TUNNEL_SERVICE], check=False)
+        if self.run(["systemctl", "is-active", "--quiet", TUNNEL_SERVICE], check=False).returncode == 0:
+            # Keep everything, so the state still says there is a tunnel to stop.
+            raise ByteGuardError(
+                "The tunnel service would not stop, so the web interface is still public. "
+                "Stop it with `sudo systemctl stop byteguard-tunnel` and run this again."
+            )
         self.paths.tunnel_unit.unlink(missing_ok=True)
         self.run(["systemctl", "daemon-reload"], check=False)
         shutil.rmtree(self.paths.tunnel_dir, ignore_errors=True)
@@ -324,15 +345,22 @@ class Manager:
             self.run(["systemctl", "enable", "--now", SERVICE])
             if "ui" in data:
                 self._start_ui(data)
-            if "tunnel" in data:
-                if not tunnel.installed(self.run):
-                    tunnel.install(self.run)
-                self._start_tunnel(data, f"http://{server['address']}:{data['ui']['port']}")
         except BaseException:
             # Leave the server as it was found, so this can simply be run again.
             self._tear_down(data)
             raise
         self._save(data)
+        if "tunnel" in data:
+            # Optional: a tunnel that will not start must not undo the VPN.
+            try:
+                if not tunnel.installed(self.run):
+                    tunnel.install(self.run)
+                self._start_tunnel(data, f"http://{server['address']}:{data['ui']['port']}")
+            except (ByteGuardError, OSError) as error:
+                self.warnings.append(
+                    f"The VPN and the web interface are running, but the tunnel did not start: {error} "
+                    "Run `sudo byteguard ui tunnel` to set it up again."
+                )
 
     def uninstall(self) -> None:
         """Remove the VPN, its firewall rules, its keys and the program itself."""

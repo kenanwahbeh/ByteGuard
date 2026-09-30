@@ -30,6 +30,8 @@ and there is no migration from a version 1 script.
   `byteguard ui setup` turns it on.
 - `byteguard ui tunnel`: the web interface on the user's own domain through
   a Cloudflare Tunnel that ByteGuard creates and runs as its own service.
+- Wrong passwords are counted per visitor, so a stranger cannot lock the
+  owner out of the web interface.
 - Firewall handling that uses ufw when it is active and iptables otherwise,
   and removes exactly the rules it added.
 
