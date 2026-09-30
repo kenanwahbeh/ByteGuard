@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.0.0 (2026-09-30)
 
 Version 2 is a rewrite from scratch. Nothing from version 1 carries over,
 and there is no migration from a version 1 script.

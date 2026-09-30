@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish the installer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: The tag must match the program's version
+        run: |
+          version="$(python3 -c 'import byteguard; print(byteguard.__version__)')"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match version $version in byteguard/__init__.py"
+            exit 1
+          fi
+      - run: python3 -m unittest discover -s tests
+      - run: python3 tools/build.py
+      - run: shellcheck --severity=warning dist/byteguard.sh
+      - name: Checksum
+        working-directory: dist
+        run: sha256sum byteguard.sh >byteguard.sh.sha256
+      - name: Release notes from the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v heading="## $version " 'index($0, heading) == 1 { found = 1; next } /^## / { found = 0 } found' \
+            CHANGELOG.md >notes.md
+          test -s notes.md
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/byteguard.sh dist/byteguard.sh.sha256 \
+            --title "ByteGuard $GITHUB_REF_NAME" --notes-file notes.md
