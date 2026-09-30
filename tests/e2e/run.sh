@@ -69,7 +69,7 @@ web_works() {
   for _ in 1 2 3 4 5 6 7 8 9 10; do
     if in_client curl -fsS -m 5 -c "$jar" -H 'X-ByteGuard: 1' \
       -d "{\"password\": \"$UI_PASSWORD\"}" "$UI_URL/api/login" >/dev/null 2>&1 &&
-      in_client curl -fsS -m 5 -b "$jar" "$UI_URL/api/state" | grep -q '"name": "laptop"'; then
+      [[ "$(in_client curl -fsS -m 5 -b "$jar" "$UI_URL/api/state")" == *'"name": "laptop"'* ]]; then
       rm -f "$jar"
       return 0
     fi
@@ -129,7 +129,10 @@ reaches_server || fail "reinstalling dropped the connection"
 step "Turn on the web interface and use it from the device"
 printf '%s\n' "$UI_PASSWORD" | byteguard ui setup --password-stdin
 web_works || fail "the web interface does not work from a connected device"
-in_client curl -fsS -m 5 "$UI_URL/" | grep -q '<title>ByteGuard</title>' || fail "the page is not served"
+# Read the whole page first: `grep -q` stops reading at the first match,
+# which kills curl with SIGPIPE and fails the pipeline under pipefail.
+page="$(in_client curl -fsS -m 5 "$UI_URL/")" || fail "the page is not served"
+[[ $page == *'<title>ByteGuard</title>'* ]] || fail "the page is not the web interface"
 curl -s -m 3 -o /dev/null "http://$HOST_IP:51821/" && fail "the web interface answers outside the VPN"
 in_client curl -s -m 5 -o /dev/null -w '%{http_code}' "$UI_URL/api/state" | grep -q 401 ||
   fail "the web interface shows data without signing in"

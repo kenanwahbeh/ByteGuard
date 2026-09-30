@@ -234,6 +234,46 @@ class DevicesApiTest(WebTestCase):
             self.assertEqual(response.status, 400, body)
 
 
+class S3ApiTest(WebTestCase):
+    BUCKET = {"endpoint": "https://account.r2.cloudflarestorage.com", "bucket": "b", "access_key": "AKID", "secret_key": "SECRET"}
+
+    def setUp(self):
+        super().setUp()
+        self.login()
+
+    def test_a_bucket_is_saved_only_after_a_test_upload_works(self):
+        self.manager.upload = lambda settings, host, text: "byteguard/first.sh"
+
+        response, body = self.request("POST", "/api/backup/s3", self.BUCKET)
+
+        self.assertEqual((response.status, body["key"]), (200, "byteguard/first.sh"))
+        self.assertTrue(self.request("GET", "/api/state")[1]["backup"]["s3"])
+
+    def test_a_failed_test_upload_saves_nothing(self):
+        def upload(settings, host, text):
+            raise ByteGuardError("The storage answered with HTTP 403 (InvalidAccessKeyId).")
+
+        self.manager.upload = upload
+
+        response, body = self.request("POST", "/api/backup/s3", self.BUCKET)
+
+        self.assertEqual(response.status, 400)
+        self.assertIn("InvalidAccessKeyId", body["message"])
+        self.assertIsNone(self.manager.s3_settings())
+
+    def test_a_plain_http_endpoint_is_refused(self):
+        response, _ = self.request("POST", "/api/backup/s3", {**self.BUCKET, "endpoint": "http://storage.example"})
+
+        self.assertEqual(response.status, 400)
+        self.assertIsNone(self.manager.s3_settings())
+
+    def test_the_secret_never_comes_back_in_the_state(self):
+        self.manager.upload = lambda settings, host, text: "k"
+        self.request("POST", "/api/backup/s3", self.BUCKET)
+
+        self.assertNotIn("SECRET", json.dumps(self.request("GET", "/api/state")[1]))
+
+
 class StaticTest(WebTestCase):
     def test_the_page_and_its_files_are_served_without_signing_in(self):
         for path, marker in (("/", "<title>ByteGuard</title>"), ("/app.js", "use strict"), ("/i18n/ar.json", "الأجهزة")):

@@ -53,6 +53,8 @@ ROUTES = [
     ("GET", r"/api/backup/download", "download_backup", True),
     ("POST", r"/api/backup/telegram", "connect_telegram", True),
     ("DELETE", r"/api/backup/telegram", "disconnect_telegram", True),
+    ("POST", r"/api/backup/s3", "connect_s3", True),
+    ("DELETE", r"/api/backup/s3", "disconnect_s3", True),
 ]
 
 
@@ -201,7 +203,7 @@ class Handler(BaseHTTPRequestHandler):
                 "version": __version__,
                 "server": {key: server[key] for key in ("endpoint", "port", "iface", "address")},
                 "devices": manager.status(),
-                "backup": {"last": last_backup, "telegram": bool(chat)},
+                "backup": {"last": last_backup, "telegram": bool(chat), "s3": bool(manager.s3_settings())},
             }
         )
 
@@ -263,6 +265,25 @@ class Handler(BaseHTTPRequestHandler):
         self.app.manager.set_telegram(token, chat_id)
         sent = self.app.manager.last_backup.get("telegram", {})
         self._json({"connected": True, "bot": bot, "chat": who, "sent": sent.get("ok", False)})
+
+    def _connect_s3(self) -> None:
+        """Save the bucket only if a test upload to it works."""
+        body = self._body()
+        settings = {name: self._text(body, name) for name in ("endpoint", "bucket", "access_key", "secret_key")}
+        if not settings["endpoint"].startswith("https://"):
+            raise ByteGuardError("The endpoint has to start with https://.")
+        settings.update(endpoint=settings["endpoint"].rstrip("/"), region=body.get("region") or "auto", folder="byteguard")
+        manager = self.app.manager
+        manager.set_s3(settings)
+        result = manager.last_backup.get("s3", {})
+        if not result.get("ok"):
+            manager.set_s3(None)
+            raise ByteGuardError(f"The test upload failed, so nothing was saved: {result.get('error')}")
+        self._json({"connected": True, "key": result["key"]})
+
+    def _disconnect_s3(self) -> None:
+        self.app.manager.set_s3(None)
+        self._json({"ok": True})
 
     def _disconnect_telegram(self) -> None:
         self.app.manager.set_telegram(None)

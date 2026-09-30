@@ -6,7 +6,7 @@ import ipaddress
 import sys
 from pathlib import Path
 
-from byteguard import __version__, backup, netdetect, telegram, tunnel, wizard
+from byteguard import __version__, backup, netdetect, s3, telegram, tunnel, wizard
 from byteguard.errors import ByteGuardError
 from byteguard.manager import DEFAULT_SUBNET, DEFAULT_UI_PORT, Manager, check_subnet
 from byteguard.paths import INTERFACE
@@ -83,9 +83,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     back_up = commands.add_parser(
         "backup",
-        help="make a backup now; `backup telegram` sends every backup to a Telegram chat",
+        help="make a backup now; `backup telegram` or `backup s3` sends every backup there too",
     )
-    back_up.add_argument("destination", nargs="?", choices=["telegram"])
+    back_up.add_argument("destination", nargs="?", choices=["telegram", "s3"])
     back_up.add_argument("--off", action="store_true", help="stop sending backups to the destination")
     back_up.set_defaults(handler=_backup)
 
@@ -336,11 +336,41 @@ def _backup(args, manager: Manager) -> None:
         if results.get("telegram", {}).get("ok"):
             print("Backup sent to Telegram.")
         print("The backup is not encrypted and holds every key. Keep it private.")
+    elif args.destination == "s3":
+        if args.off:
+            manager.set_s3(None)
+            print("Backups are no longer uploaded to S3 storage. Copies already there were kept.")
+        else:
+            _connect_s3(manager, open_terminal())
     elif args.off:
         manager.set_telegram(None)
         print("Backups are no longer sent to Telegram.")
     else:
         _connect_telegram(manager, open_terminal())
+
+
+def _connect_s3(manager: Manager, term: Terminal) -> None:
+    manager.server()
+    term.say("Backups can go to any S3-compatible storage. For Cloudflare R2: create a bucket,")
+    term.say("then an API token with Object Read & Write on that bucket only.")
+    endpoint = term.ask("Endpoint (R2: https://<account id>.r2.cloudflarestorage.com)")
+    if not endpoint.startswith("https://"):
+        raise ByteGuardError("The endpoint has to start with https://, so keys never travel unencrypted.")
+    settings = {
+        "endpoint": endpoint.rstrip("/"),
+        "bucket": term.ask("Bucket name"),
+        "access_key": term.ask("Access key ID"),
+        "secret_key": term.ask_secret("Secret access key"),
+        "region": term.ask("Region", "auto"),
+        "folder": "byteguard",
+    }
+    manager.set_s3(settings)
+    result = manager.last_backup.get("s3", {})
+    if not result.get("ok"):
+        manager.set_s3(None)
+        raise ByteGuardError(f"The test upload failed, so nothing was saved: {result.get('error')}")
+    term.say(f"Done. A backup was just uploaded as {result['key']}, and one will follow every change.")
+    term.say(f"The newest {s3.KEEP} backups are kept there; older ones are deleted.")
 
 
 def _connect_telegram(manager: Manager, term: Terminal) -> None:

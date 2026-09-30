@@ -61,6 +61,24 @@
         </form>
         <p class="muted small" data-i18n="telegram_help"></p>
         <button id="telegram-off" type="button" class="quiet" data-i18n="telegram_off" hidden></button>
+
+        <h3 data-i18n="s3_title"></h3>
+        <p id="s3-state" class="muted"></p>
+        <form id="s3-form" class="stack">
+          <label for="s3-endpoint" data-i18n="s3_endpoint"></label>
+          <input id="s3-endpoint" type="url" required placeholder="https://ACCOUNT_ID.r2.cloudflarestorage.com" dir="ltr">
+          <label for="s3-bucket" data-i18n="s3_bucket"></label>
+          <input id="s3-bucket" type="text" required dir="ltr">
+          <label for="s3-access" data-i18n="s3_access"></label>
+          <input id="s3-access" type="text" autocomplete="off" required dir="ltr">
+          <label for="s3-secret" data-i18n="s3_secret"></label>
+          <input id="s3-secret" type="password" autocomplete="off" required dir="ltr">
+          <label for="s3-region" data-i18n="s3_region"></label>
+          <input id="s3-region" type="text" value="auto" dir="ltr">
+          <button type="submit" data-i18n="s3_connect"></button>
+        </form>
+        <p class="muted small" data-i18n="s3_help"></p>
+        <button id="s3-off" type="button" class="quiet" data-i18n="s3_off" hidden></button>
       </section>
     </div>
   </main>
