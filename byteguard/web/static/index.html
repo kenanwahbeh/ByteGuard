@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>ByteGuard</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="bar">
+    <h1>ByteGuard</h1>
+    <p id="server" class="muted"></p>
+    <div class="bar-actions">
+      <button id="language" type="button" class="quiet"></button>
+      <button id="logout" type="button" class="quiet" data-i18n="logout" hidden></button>
+    </div>
+  </header>
+
+  <main>
+    <p id="notice" class="notice" role="status" hidden></p>
+
+    <section id="login" class="card narrow" hidden>
+      <h2 data-i18n="login_title"></h2>
+      <form id="login-form">
+        <label for="password" data-i18n="password"></label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button type="submit" data-i18n="login"></button>
+      </form>
+    </section>
+
+    <div id="app" hidden>
+      <section class="card">
+        <h2 data-i18n="devices"></h2>
+        <form id="add-form" class="row">
+          <label for="new-name" class="hidden-label" data-i18n="device_name"></label>
+          <input id="new-name" type="text" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" required data-i18n-placeholder="device_name">
+          <button type="submit" data-i18n="add_device"></button>
+        </form>
+        <p class="muted small" data-i18n="name_rule"></p>
+        <p id="empty" class="muted" data-i18n="no_devices" hidden></p>
+        <ul id="devices" class="devices"></ul>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="backup"></h2>
+        <p data-i18n="backup_intro"></p>
+        <p id="backup-last" class="muted"></p>
+        <div class="row">
+          <button id="backup-now" type="button" data-i18n="backup_now"></button>
+          <a id="backup-download" class="button quiet" href="/api/backup/download" data-i18n="backup_download"></a>
+        </div>
+        <p class="warning" data-i18n="backup_warning"></p>
+
+        <h3>Telegram</h3>
+        <p id="telegram-state" class="muted"></p>
+        <form id="telegram-form" class="row">
+          <label for="telegram-token" class="hidden-label" data-i18n="telegram_token"></label>
+          <input id="telegram-token" type="password" autocomplete="off" required data-i18n-placeholder="telegram_token">
+          <button type="submit" data-i18n="telegram_connect"></button>
+        </form>
+        <p class="muted small" data-i18n="telegram_help"></p>
+        <button id="telegram-off" type="button" class="quiet" data-i18n="telegram_off" hidden></button>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="device-dialog">
+    <h2 id="dialog-name"></h2>
+    <img id="dialog-qr" alt="" width="260" height="260">
+    <p class="muted" data-i18n="scan_hint"></p>
+    <pre id="dialog-config" dir="ltr"></pre>
+    <div class="row">
+      <a id="dialog-download" class="button" data-i18n="download_config"></a>
+      <button id="dialog-close" type="button" class="quiet" data-i18n="close"></button>
+    </div>
+  </dialog>
+
+  <footer class="muted small"><span id="version"></span></footer>
+  <script src="/app.js"></script>
+</body>
+</html>

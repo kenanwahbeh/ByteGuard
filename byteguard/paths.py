@@ -14,6 +14,7 @@ class Paths:
     program: Path = Path("/opt/byteguard")
     launcher: Path = Path("/usr/local/bin/byteguard")
     backups: Path = Path("/var/backups/byteguard")
+    ui_unit: Path = Path("/etc/systemd/system/byteguard-ui.service")
 
     @property
     def state(self) -> Path:

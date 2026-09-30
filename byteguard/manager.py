@@ -10,6 +10,7 @@ import tempfile
 from byteguard import backup, firewall, state, system, telegram, wg
 from byteguard.errors import ByteGuardError
 from byteguard.paths import INTERFACE, Paths
+from byteguard.web import auth
 
 DEFAULT_SUBNET = "10.66.66.0/24"
 MTU = 1420
@@ -17,6 +18,38 @@ KEEPALIVE = 25
 DNS = ["1.1.1.1", "1.0.0.1"]
 
 SERVICE = f"wg-quick@{INTERFACE}"
+UI_SERVICE = "byteguard-ui"
+DEFAULT_UI_PORT = 51821
+
+# Root, but with nothing beyond managing the VPN interface, and a read-only
+# system apart from ByteGuard's own files.
+UI_UNIT = """\
+[Unit]
+Description=ByteGuard web interface
+After={service}.service network-online.target
+Wants={service}.service
+
+[Service]
+ExecStart={launcher} serve
+Restart=on-failure
+RestartSec=3
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths={etc} {wireguard} {backups}
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target
+"""
 
 
 class Manager:
@@ -74,6 +107,67 @@ class Manager:
     def client_config(self, name: str) -> str:
         data = self._state()
         return wg.client_config(data, _find(data, name))
+
+    def qr_svg(self, name: str) -> str:
+        """The device's configuration as a QR code image for the web interface."""
+        return self.run(["qrencode", "-t", "SVG", "-o", "-"], input=self.client_config(name)).stdout
+
+    def state_for_backup(self) -> dict:
+        return self._state()
+
+    def ui(self) -> dict | None:
+        """The web interface's settings, or None when it is off."""
+        return self._state().get("ui")
+
+    def enable_ui(self, password: str, port: int = DEFAULT_UI_PORT) -> str:
+        """Turn the web interface on, reachable only from inside the VPN. Returns its address."""
+        if len(password) < auth.MIN_PASSWORD_LENGTH:
+            raise ByteGuardError(f"The password needs at least {auth.MIN_PASSWORD_LENGTH} characters.")
+        with state.locked(self.paths.lock):
+            data = self._state()
+            previous = data.get("ui")
+            if previous and previous["port"] != port:
+                firewall.close_ui(self.run, data["firewall"]["mode"], previous["port"])
+            data["ui"] = {"port": port, "password": auth.hash_password(password)}
+            self._start_ui(data)
+            self._save(data)
+            return f"http://{data['server']['address']}:{port}"
+
+    def disable_ui(self) -> None:
+        with state.locked(self.paths.lock):
+            data = self._state()
+            self._stop_ui(data)
+            data.pop("ui", None)
+            state.write_private(self.paths.wg_conf, wg.server_config(data))
+            self._save(data)
+
+    def _start_ui(self, data: dict) -> None:
+        firewall.open_ui(self.run, data["firewall"]["mode"], data["ui"]["port"])
+        # The rule is also an interface hook, so it returns after a reboot.
+        state.write_private(self.paths.wg_conf, wg.server_config(data))
+        self.paths.ui_unit.parent.mkdir(parents=True, exist_ok=True)
+        self.paths.ui_unit.write_text(
+            UI_UNIT.format(
+                service=SERVICE,
+                launcher=self.paths.launcher,
+                etc=self.paths.etc,
+                wireguard=self.paths.wireguard,
+                backups=self.paths.backups,
+            )
+        )
+        self.paths.backups.mkdir(parents=True, exist_ok=True)
+        self.run(["systemctl", "daemon-reload"])
+        self.run(["systemctl", "enable", UI_SERVICE])
+        # Restart, so a changed password ends every open session.
+        self.run(["systemctl", "restart", UI_SERVICE])
+
+    def _stop_ui(self, data: dict) -> None:
+        if "ui" not in data:
+            return
+        self.run(["systemctl", "disable", "--now", UI_SERVICE], check=False)
+        self.paths.ui_unit.unlink(missing_ok=True)
+        self.run(["systemctl", "daemon-reload"], check=False)
+        firewall.close_ui(self.run, data["firewall"]["mode"], data["ui"]["port"])
 
     def qr_code(self, name: str) -> str:
         """The device's configuration as a QR code drawn with terminal characters."""
@@ -150,6 +244,8 @@ class Manager:
             firewall.open_ports(self.run, data["firewall"]["mode"], server["iface"], server["port"])
             state.write_private(self.paths.wg_conf, wg.server_config(data))
             self.run(["systemctl", "enable", "--now", SERVICE])
+            if "ui" in data:
+                self._start_ui(data)
         except BaseException:
             # Leave the server as it was found, so this can simply be run again.
             self._tear_down(data)
@@ -168,6 +264,7 @@ class Manager:
 
     def _tear_down(self, data: dict) -> None:
         server = data["server"]
+        self._stop_ui(data)
         # Stopping the interface runs PostDown, which removes its iptables rules.
         self.run(["systemctl", "disable", "--now", SERVICE], check=False)
         firewall.close_ports(self.run, data["firewall"]["mode"], server["iface"], server["port"])

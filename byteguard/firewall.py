@@ -28,7 +28,7 @@ def detect(run) -> str:
     return UFW if "Status: active" in status else IPTABLES
 
 
-def hooks(mode: str, iface: str, port: int, subnet: str) -> tuple[list[str], list[str]]:
+def hooks(mode: str, iface: str, port: int, subnet: str, ui_port: int | None = None) -> tuple[list[str], list[str]]:
     """The wg-quick PostUp and PostDown commands for this firewall mode.
 
     With ufw the port and the forwarding are ufw rules (see `open_ports`), so
@@ -43,9 +43,35 @@ def hooks(mode: str, iface: str, port: int, subnet: str) -> tuple[list[str], lis
             ("-I FORWARD", "-D FORWARD", "-i %i -j ACCEPT"),
             ("-I FORWARD", "-D FORWARD", "-o %i -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT"),
         ]
+        if ui_port:
+            rules.append(("-I INPUT", "-D INPUT", _ui_rule(ui_port)))
     up = [f"iptables -w {add} {spec}" for add, _, spec in rules]
     down = [f"iptables -w {remove} {spec}" for _, remove, spec in rules]
     return up, down
+
+
+def _ui_rule(ui_port: int) -> str:
+    # Only traffic that arrives through the VPN may reach the web interface.
+    return f"-i %i -p tcp --dport {ui_port} -j ACCEPT"
+
+
+def open_ui(run, mode: str, ui_port: int) -> None:
+    """Let connected devices, and nobody else, reach the web interface."""
+    if mode == UFW:
+        run(["ufw", "allow", "in", "on", INTERFACE, "to", "any", "port", str(ui_port), "proto", "tcp", "comment", "ByteGuard"])
+        return
+    rule = _ui_rule(ui_port).replace("%i", INTERFACE).split()
+    # The interface hook adds this rule on every start; add it now unless it is there.
+    if run(["iptables", "-w", "-C", "INPUT", *rule], check=False).returncode != 0:
+        run(["iptables", "-w", "-I", "INPUT", *rule], check=False)
+
+
+def close_ui(run, mode: str, ui_port: int) -> None:
+    if mode == UFW:
+        run(["ufw", "delete", "allow", "in", "on", INTERFACE, "to", "any", "port", str(ui_port), "proto", "tcp"], check=False)
+        return
+    rule = _ui_rule(ui_port).replace("%i", INTERFACE).split()
+    run(["iptables", "-w", "-D", "INPUT", *rule], check=False)
 
 
 def _ufw_rules(iface: str, port: int) -> list[list[str]]:

@@ -25,6 +25,9 @@ and there is no migration from a version 1 script.
   that restores the whole setup on a fresh server with the same keys.
 - `byteguard backup` and `byteguard backup telegram`, which sends every
   backup to a Telegram chat through the user's own bot.
+- A web interface in Arabic and English, reachable only from inside the
+  VPN: devices, QR codes, connection status, backups and Telegram.
+  `byteguard ui setup` turns it on.
 - Firewall handling that uses ufw when it is active and iptables otherwise,
   and removes exactly the rules it added.
 

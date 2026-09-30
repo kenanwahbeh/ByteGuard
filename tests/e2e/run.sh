@@ -15,6 +15,8 @@ HOST_IP="10.200.0.1"
 CLIENT_IP="10.200.0.2"
 SERVER_VPN_IP="10.66.66.1"
 PORT="51820"
+UI_URL="http://$SERVER_VPN_IP:51821"
+UI_PASSWORD="end-to-end password"
 
 step() { printf '\n==> %s\n' "$*"; }
 fail() {
@@ -57,6 +59,23 @@ reaches_server() {
     in_client ping -c 1 -W 2 "$SERVER_VPN_IP" >/dev/null 2>&1 && return 0
     sleep 1
   done
+  return 1
+}
+
+# Succeeds once the web interface answers a signed-in request from the client.
+web_works() {
+  local jar
+  jar="$(mktemp)"
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if in_client curl -fsS -m 5 -c "$jar" -H 'X-ByteGuard: 1' \
+      -d "{\"password\": \"$UI_PASSWORD\"}" "$UI_URL/api/login" >/dev/null 2>&1 &&
+      in_client curl -fsS -m 5 -b "$jar" "$UI_URL/api/state" | grep -q '"name": "laptop"'; then
+      rm -f "$jar"
+      return 0
+    fi
+    sleep 2
+  done
+  rm -f "$jar"
   return 1
 }
 
@@ -107,6 +126,14 @@ bash "$INSTALLER" --non-interactive
 byteguard list | grep -E '^laptop ' >/dev/null || fail "reinstalling lost a device"
 reaches_server || fail "reinstalling dropped the connection"
 
+step "Turn on the web interface and use it from the device"
+printf '%s\n' "$UI_PASSWORD" | byteguard ui setup --password-stdin
+web_works || fail "the web interface does not work from a connected device"
+in_client curl -fsS -m 5 "$UI_URL/" | grep -q '<title>ByteGuard</title>' || fail "the page is not served"
+curl -s -m 3 -o /dev/null "http://$HOST_IP:51821/" && fail "the web interface answers outside the VPN"
+in_client curl -s -m 5 -o /dev/null -w '%{http_code}' "$UI_URL/api/state" | grep -q 401 ||
+  fail "the web interface shows data without signing in"
+
 step "Back up, wipe the server and restore from the backup file"
 byteguard backup
 backup_copy="$(mktemp)"
@@ -121,11 +148,13 @@ byteguard list | grep -E '^laptop ' >/dev/null || fail "the restore lost a devic
 # starts a new handshake only after about 15 seconds without an answer.
 reaches_server || reaches_server || reaches_server ||
   fail "a device cannot reconnect to the restored server without new settings"
+web_works || fail "the restore did not bring the web interface back with its password"
 
 step "Uninstall"
 byteguard uninstall --yes
 ip link show wg0 >/dev/null 2>&1 && fail "wg0 still exists"
-for path in /etc/wireguard/wg0.conf /etc/byteguard /opt/byteguard /usr/local/bin/byteguard; do
+for path in /etc/wireguard/wg0.conf /etc/byteguard /opt/byteguard /usr/local/bin/byteguard \
+  /etc/systemd/system/byteguard-ui.service; do
   [[ -e $path ]] && fail "$path was left behind"
 done
 [[ "$(sysctl -n net.ipv4.ip_forward)" == 1 ]] || fail "uninstalling turned forwarding off"
