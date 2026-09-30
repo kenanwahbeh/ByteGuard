@@ -117,7 +117,10 @@ bash "$backup_copy" --yes
 rm -f "$backup_copy"
 [[ "$(wg show wg0 public-key)" == "$server_key" ]] || fail "the restored server has a different key"
 byteguard list | grep -E '^laptop ' >/dev/null || fail "the restore lost a device"
-reaches_server || fail "a device cannot reconnect to the restored server without new settings"
+# The device still holds a session with the server that was wiped. WireGuard
+# starts a new handshake only after about 15 seconds without an answer.
+reaches_server || reaches_server || reaches_server ||
+  fail "a device cannot reconnect to the restored server without new settings"
 
 step "Uninstall"
 byteguard uninstall --yes
