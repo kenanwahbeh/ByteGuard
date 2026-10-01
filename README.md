@@ -25,11 +25,24 @@ curl -fsSL https://bytebalancetech.com/byteguard.sh -o byteguard.sh
 sudo bash byteguard.sh
 ```
 
-The link leads to the latest release on GitHub, which also carries
-`byteguard.sh.sha256`, and the program is
-embedded in the installer as plain text, so you can read it before running
-it. Version 1, the old single-file script, stays available as release
-[v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0);
+This address redirects to the latest release on GitHub. You can also
+download from GitHub directly:
+
+```bash
+curl -fsSL https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh -o byteguard.sh
+```
+
+To check the file before running it, compare it with the checksum
+published with the release:
+
+```bash
+curl -fsSLO https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh.sha256
+sha256sum -c byteguard.sh.sha256
+```
+
+The program is embedded in the installer as plain text, so you can also
+read it before running it. Version 1, the old single-file script, stays
+available as release [v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0);
 version 2 does not import its data.
 
 ## What it does
@@ -62,8 +75,9 @@ version 2 does not import its data.
   Tunnel, with no port opened. ByteGuard creates a tunnel of its own and
   never touches a cloudflared that is already on the server.
 
-Everything runs on your server and your own accounts. ByteGuard has no
-hosted service and collects no data.
+Everything runs on your server and your own accounts. ByteGuard collects no
+data, and your keys and devices go nowhere except the backup destinations
+you choose.
 
 ## Setup
 
@@ -104,13 +118,12 @@ The server's keys and the devices are stored in
 `sudo byteguard ui setup` asks for a password and turns the web interface
 on at `http://<server's VPN address>:51821`, for example
 `http://10.66.66.1:51821`. Open it from a device that is connected to the
-VPN; from anywhere else the address does not answer.
+VPN; from anywhere else the address does not answer. The page is in
+English or Arabic, and the button in the top corner switches between them.
 
 <p align="center">
   <img src="assets/screenshots/web-en.png" alt="The whole web interface: devices, backups, Telegram and S3 storage" width="520">
 </p>
- The page is in
-English or Arabic, and the button in the top corner switches between them.
 
 The interface runs as its own service with a read-only view of the system
 apart from ByteGuard's files. Eight wrong passwords from the same address

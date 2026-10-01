@@ -27,7 +27,28 @@ sudo bash byteguard.sh
 
 </div>
 
-البرنامج مضمّن داخل ملف التنصيب كنص مقروء، فتستطيع قراءته قبل تشغيله، ومع كل إصدار ملف `byteguard.sh.sha256` للتحقق منه.
+هذا العنوان يحوّل إلى آخر إصدار على GitHub. ويمكنك التنزيل من GitHub مباشرة:
+
+<div dir="ltr">
+
+```bash
+curl -fsSL https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh -o byteguard.sh
+```
+
+</div>
+
+وللتحقق من الملف قبل تشغيله، قارنه ببصمة SHA-256 المنشورة مع الإصدار:
+
+<div dir="ltr">
+
+```bash
+curl -fsSLO https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh.sha256
+sha256sum -c byteguard.sh.sha256
+```
+
+</div>
+
+البرنامج مضمّن داخل ملف التنصيب كنص مقروء، فتستطيع أيضاً قراءته قبل تشغيله.
 
 ## ماذا يفعل
 
@@ -39,7 +60,7 @@ sudo bash byteguard.sh
 - **اختيارياً:** الواجهة على دومينك عبر Cloudflare Tunnel دون فتح أي منفذ. ينشئ ByteGuard نفقاً خاصاً به ولا يلمس أي نفق موجود على السيرفر.
 - **يحترم الجدار الناري الموجود:** يضيف قواعد ufw أو iptables دون مسح أي شيء، وإزالة التنصيب تحذف ما أضافه فقط.
 
-كل شيء يعمل على سيرفرك وبحساباتك أنت. ByteGuard لا يملك خدمة مستضافة ولا يجمع أي بيانات.
+كل شيء يعمل على سيرفرك وبحساباتك أنت. لا يجمع ByteGuard أي بيانات، ولا تخرج مفاتيحك وأجهزتك إلا إلى وجهات النسخ الاحتياطي التي تختارها.
 
 ## الأوامر
 
