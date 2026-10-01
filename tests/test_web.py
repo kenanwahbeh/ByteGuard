@@ -79,7 +79,8 @@ class WebTestCase(unittest.TestCase):
         )
         self.manager.set_up(iface="eth0", endpoint="203.0.113.7", port=51820)
         self.manager.enable_ui(PASSWORD)
-        self.httpd = server.make_server(server.App(self.manager), "127.0.0.1", 0)
+        self.app = server.App(self.manager)
+        self.httpd = server.make_server(self.app, "127.0.0.1", 0)
         thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(thread.join)
@@ -221,6 +222,32 @@ class ChangePasswordTest(WebTestCase):
         self.assertEqual(self.change(cookie=False)[0].status, 401)
         self.assertEqual(self.change(csrf=False)[0].status, 403)
         self.assertTrue(auth.verify_password(PASSWORD, self.manager.ui()["password"]))
+
+    def test_other_sessions_end_before_the_backup_is_sent(self):
+        other = self.request("POST", "/api/login", {"password": PASSWORD}, cookie=False)[0]
+        other_token = other.headers["Set-Cookie"].split(";")[0].split("=", 1)[1]
+        still_valid = []
+        self.manager.send = lambda *args: None
+        self.manager.set_telegram("123:token", 42)
+        self.manager.send = lambda *args: still_valid.append(self.app.sessions.valid(other_token))
+
+        self.change()
+
+        self.assertEqual(still_valid, [False])
+
+    def test_a_failed_backup_is_reported_but_the_password_is_still_changed(self):
+        def send(*args):
+            raise ByteGuardError("Telegram is down.")
+
+        self.manager.send = lambda *args: None
+        self.manager.set_telegram("123:token", 42)
+        self.manager.send = send
+
+        response, body = self.change()
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(body["backup"]["telegram"], {"ok": False, "error": "Telegram is down."})
+        self.assertTrue(auth.verify_password(self.NEW, self.manager.ui()["password"]))
 
     def test_a_backup_is_made_with_the_new_password(self):
         self.change()

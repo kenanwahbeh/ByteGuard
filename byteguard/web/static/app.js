@@ -301,9 +301,12 @@ $("password-form").addEventListener("submit", async (event) => {
   const [current, fresh, repeat] = fields.map((field) => field.value);
   if (fresh !== repeat) return notify(t("error_passwords_differ"), true);
   try {
-    await api("POST", "/api/password", { current, new: fresh });
+    const result = await api("POST", "/api/password", { current, new: fresh });
     for (const field of fields) field.value = "";
-    notify(t("password_changed"));
+    // The password is changed either way; say which backup still has the old one.
+    const failed = Object.entries(result.backup).find(([, outcome]) => !outcome.ok);
+    if (failed) notify(t("password_backup_failed", { destination: failed[0], error: failed[1].error }), true);
+    else notify(t("password_changed"));
   } catch (error) {
     explain(error);
   }

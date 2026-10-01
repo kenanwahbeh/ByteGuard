@@ -62,6 +62,7 @@
   "repeat_password": "New password again",
   "password_help": "At least 8 characters. Changing it signs out every other open session.",
   "password_changed": "Password changed. Other sessions were signed out.",
+  "password_backup_failed": "Password changed, but the backup to {destination} failed: {error}. That destination still has the old password; press Back up now once it is fixed.",
   "error_current_password": "The current password is wrong.",
   "error_short_password": "The new password is shorter than 8 characters.",
   "error_passwords_differ": "The two new passwords do not match."
