@@ -37,6 +37,11 @@ and storage keys inside it. Keep the chat and the bucket private.
   knows the address. Wrong passwords are limited per visitor, but a strong
   password matters, and Cloudflare Access in front of it adds a second
   gate.
+- The web interface answers only requests addressed to the VPN address,
+  or that arrive through the tunnel on the server itself, so a website a
+  connected device visits cannot reach it under a name of its own (DNS
+  rebinding). Requests are limited in size and dropped after 30 seconds
+  without progress.
 - The web interface service keeps a single capability (managing network
   interfaces) and sees the system read-only apart from ByteGuard's own
   directories.
@@ -58,7 +63,10 @@ makes these requests, none of which carries your data:
 - during setup, `api.ipify.org` (or `icanhazip.com`) to suggest the
   server's public address;
 - with `byteguard ui tunnel`, `cloudflare-dns.com` to check the domain's
-  name servers, and GitHub to download `cloudflared` if it is missing.
+  name servers, and, if `cloudflared` is missing, `pkg.cloudflare.com` to
+  install it. ByteGuard checks Cloudflare's package key against the
+  fingerprint built into the program before adding the repository, and apt
+  checks every package against that key.
 
 The short install address `bytebalancetech.com/byteguard.sh` is a redirect
 served by the project's website, which sees the download request as any

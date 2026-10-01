@@ -8,6 +8,19 @@
   password, counts wrong guesses like wrong sign-ins, and signs out every
   other open session.
 
+### Security
+
+- The web interface refuses requests addressed to any name but the VPN
+  address, unless they come through the tunnel on the server itself, so a
+  website a connected device visits cannot reach it (DNS rebinding).
+- A negative or garbled `Content-Length` is refused instead of read until
+  the client hangs up, and a client that stops sending is dropped after 30
+  seconds.
+- `cloudflared` is installed from Cloudflare's signed apt repository, with
+  the repository key pinned by its fingerprint, instead of an unchecked
+  download from GitHub. apt now keeps it updated.
+- Two requests with the same expired session no longer make one of them fail.
+
 ## 2.0.0 (2026-09-30)
 
 Version 2 is a rewrite from scratch. Nothing from version 1 carries over,

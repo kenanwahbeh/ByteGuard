@@ -4,11 +4,11 @@ ByteGuard never touches a cloudflared that is already on the server: its
 tunnel has its own name, its own files and its own service.
 """
 
+import hashlib
 import json
 import secrets
 import shutil
 import socket
-import tempfile
 import urllib.request
 from pathlib import Path
 
@@ -16,8 +16,14 @@ from byteguard.errors import ByteGuardError
 
 DOH = "https://cloudflare-dns.com/dns-query?name={name}&type=NS"
 NS_RECORD = 2
-DEB = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-{arch}.deb"
-ARCHITECTURES = {"amd64", "arm64", "armhf", "386"}
+# Cloudflare's signed package repository. The key is pinned by its
+# fingerprint, so a key swapped on the way, or on the server, is refused.
+APT_KEY_URL = "https://pkg.cloudflare.com/cloudflare-main.gpg"
+APT_KEY_FINGERPRINT = "CC94B39C77AE7342A68B89628A682D308D4E5E73"
+APT_REPOSITORY = "https://pkg.cloudflare.com/cloudflared"
+APT_KEYRING = Path("/etc/apt/keyrings/byteguard-cloudflare.gpg")
+APT_SOURCES = Path("/etc/apt/sources.list.d")
+APT_SOURCE_NAME = "byteguard-cloudflared.list"
 
 
 def _nameservers(name: str) -> list[str]:
@@ -61,17 +67,58 @@ def other_tunnel_running(run) -> bool:
     return run(["systemctl", "is-active", "--quiet", "cloudflared"], check=False).returncode == 0
 
 
-def install(run, download=urllib.request.urlretrieve) -> None:
-    arch = run(["dpkg", "--print-architecture"]).stdout.strip()
-    if arch not in ARCHITECTURES:
-        raise ByteGuardError(f"Cloudflare publishes no cloudflared package for {arch}. Install it by hand first.")
-    with tempfile.TemporaryDirectory() as folder:
-        package = Path(folder) / "cloudflared.deb"
+def _fetch(url: str) -> bytes:
+    with urllib.request.urlopen(url, timeout=30) as response:
+        return response.read(1024 * 1024)
+
+
+def key_fingerprint(key: bytes) -> str:
+    """The OpenPGP v4 fingerprint of the first public key in a binary keyring."""
+    try:
+        tag = key[0]
+        if not tag & 0x80:
+            raise ValueError
+        if tag & 0x40:
+            packet, size = tag & 0x3F, key[1]
+            if size < 192:
+                start, length = 2, size
+            elif size < 224:
+                start, length = 3, ((size - 192) << 8) + key[2] + 192
+            elif size == 255:
+                start, length = 6, int.from_bytes(key[2:6], "big")
+            else:
+                raise ValueError
+        else:
+            packet, width = (tag >> 2) & 0x0F, {0: 1, 1: 2, 2: 4}[tag & 3]
+            start, length = 1 + width, int.from_bytes(key[1 : 1 + width], "big")
+        body = key[start : start + length]
+        if packet != 6 or len(body) != length or body[0] != 4:
+            raise ValueError
+    except (IndexError, KeyError, ValueError):
+        return ""
+    return hashlib.sha1(b"\x99" + len(body).to_bytes(2, "big") + body).hexdigest().upper()
+
+
+def install(run, fetch=_fetch, keyring: Path = APT_KEYRING, sources: Path = APT_SOURCES) -> None:
+    """Install cloudflared from Cloudflare's signed apt repository, so apt also keeps it updated."""
+    listed = [*sources.glob("*.list"), *sources.glob("*.sources")]
+    if not any(APT_REPOSITORY in path.read_text() for path in listed):
         try:
-            download(DEB.format(arch=arch), package)
+            key = fetch(APT_KEY_URL)
         except OSError:
-            raise ByteGuardError("Could not download cloudflared from GitHub.") from None
-        run(["dpkg", "-i", str(package)])
+            raise ByteGuardError("Could not download Cloudflare's package key.") from None
+        if key_fingerprint(key) != APT_KEY_FINGERPRINT:
+            raise ByteGuardError(
+                "Cloudflare's package key is not the expected one, so nothing was installed. "
+                "Install cloudflared by hand from https://pkg.cloudflare.com and run this again."
+            )
+        keyring.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+        keyring.write_bytes(key)
+        keyring.chmod(0o644)
+        source = sources / APT_SOURCE_NAME
+        source.write_text(f"deb [signed-by={keyring}] {APT_REPOSITORY} any main\n")
+    run(["apt-get", "update", "-qq"])
+    run(["apt-get", "install", "-y", "-qq", "cloudflared"], env={"DEBIAN_FRONTEND": "noninteractive"})
 
 
 def create(run, home: Path, hostname: str) -> dict:

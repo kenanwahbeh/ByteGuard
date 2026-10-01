@@ -144,7 +144,8 @@ without being connected to the VPN and without opening a port. It needs a
 domain that is in your own Cloudflare account; the free plan is enough.
 
 It asks for the name, checks that the domain is on Cloudflare, installs
-`cloudflared` if it is missing, and prints a link. Open the link in a
+`cloudflared` from Cloudflare's signed package repository if it is
+missing (so `apt upgrade` keeps it updated), and prints a link. Open the link in a
 browser, sign in to Cloudflare and choose the domain. ByteGuard then
 creates a tunnel, points the name at it and runs it as
 `byteguard-tunnel.service`. The sign-in certificate, which could manage the
