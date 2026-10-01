@@ -49,5 +49,24 @@ IP forwarding off, because other software such as Docker may rely on it.
 It never touches a WireGuard setup or a Cloudflare tunnel it did not
 create.
 
-ByteGuard has no hosted service and sends nothing anywhere except to the
-backup destinations you configure.
+## Outside connections
+
+ByteGuard collects no data. Your keys and devices leave the server only
+as backups, and only to the destinations you configure. The program also
+makes these requests, none of which carries your data:
+
+- during setup, `api.ipify.org` (or `icanhazip.com`) to suggest the
+  server's public address;
+- with `byteguard ui tunnel`, `cloudflare-dns.com` to check the domain's
+  name servers, and GitHub to download `cloudflared` if it is missing.
+
+The short install address `bytebalancetech.com/byteguard.sh` is a redirect
+served by the project's website, which sees the download request as any
+website does. Downloading from GitHub directly, as the README shows, skips
+that step. Either way, check the file against the `byteguard.sh.sha256`
+published with the release on GitHub:
+
+```bash
+curl -fsSLO https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh.sha256
+sha256sum -c byteguard.sh.sha256
+```
