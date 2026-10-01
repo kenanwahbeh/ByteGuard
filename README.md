@@ -45,6 +45,14 @@ read it before running it. Version 1, the old single-file script, stays
 available as release [v1.0.0](https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0);
 version 2 does not import its data.
 
+## Update
+
+Download the new installer and run it on the server, the same way as
+installing. On a server that is already set up it replaces only the
+program: the keys, the devices and the settings stay, and connected
+devices stay connected. If the web interface is running it is restarted
+so it runs the new version, which signs everyone out of it.
+
 ## What it does
 
 - One installer file for Ubuntu 22.04+ and Debian 12+. The program is
