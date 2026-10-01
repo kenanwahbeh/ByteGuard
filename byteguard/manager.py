@@ -179,6 +179,21 @@ class Manager:
             self._save(data)
             return f"http://{data['server']['address']}:{port}"
 
+    def set_password(self, password: str) -> None:
+        """Replace the web interface's password.
+
+        Only the state is written, so the caller can end sessions straight
+        away; backing up the change with back_up() is the caller's to do.
+        """
+        if len(password) < auth.MIN_PASSWORD_LENGTH:
+            raise ByteGuardError(f"The password needs at least {auth.MIN_PASSWORD_LENGTH} characters.")
+        with state.locked(self.paths.lock):
+            data = self._state()
+            if "ui" not in data:
+                raise ByteGuardError("The web interface is off. Turn it on first with `sudo byteguard ui setup`.")
+            data["ui"]["password"] = auth.hash_password(password)
+            state.save(self.paths.state, data)
+
     def disable_ui(self) -> None:
         with state.locked(self.paths.lock):
             data = self._state()

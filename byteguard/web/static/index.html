@@ -80,6 +80,20 @@
         <p class="muted small" data-i18n="s3_help"></p>
         <button id="s3-off" type="button" class="quiet" data-i18n="s3_off" hidden></button>
       </section>
+
+      <section class="card">
+        <h2 data-i18n="change_password"></h2>
+        <form id="password-form" class="stack">
+          <label for="current-password" data-i18n="current_password"></label>
+          <input id="current-password" type="password" autocomplete="current-password" required>
+          <label for="new-password" data-i18n="new_password"></label>
+          <input id="new-password" type="password" autocomplete="new-password" minlength="8" required>
+          <label for="repeat-password" data-i18n="repeat_password"></label>
+          <input id="repeat-password" type="password" autocomplete="new-password" minlength="8" required>
+          <button type="submit" data-i18n="change_password"></button>
+        </form>
+        <p class="muted small" data-i18n="password_help"></p>
+      </section>
     </div>
   </main>
 

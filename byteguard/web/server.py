@@ -7,6 +7,7 @@ inside the VPN, so only connected devices can reach it.
 import base64
 import json
 import re
+import threading
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -43,6 +44,7 @@ DEVICE = r"(?P<name>[A-Za-z0-9][A-Za-z0-9_-]{0,31})"
 ROUTES = [
     ("POST", r"/api/login", "login", False),
     ("POST", r"/api/logout", "logout", True),
+    ("POST", r"/api/password", "change_password", True),
     ("GET", r"/api/state", "state", True),
     ("POST", r"/api/devices", "add_device", True),
     ("GET", rf"/api/devices/{DEVICE}", "device", True),
@@ -69,6 +71,10 @@ class App:
     def __init__(self, manager, sessions: auth.Sessions | None = None):
         self.manager = manager
         self.sessions = sessions or auth.Sessions()
+        # Held while a password is checked and a session started, and while
+        # the password is replaced and sessions ended, so a sign-in with the
+        # old password can never start a session after the change.
+        self.auth_lock = threading.Lock()
 
 
 def make_server(app: App, address: str, port: int) -> ThreadingHTTPServer:
@@ -160,17 +166,48 @@ class Handler(BaseHTTPRequestHandler):
     def _login(self) -> None:
         sessions = self.app.sessions
         client = self._client()
-        if sessions.locked_out(client):
-            raise Problem(HTTPStatus.TOO_MANY_REQUESTS, "locked")
-        stored = self.app.manager.ui()
-        if stored is None or not auth.verify_password(self._text(self._body(), "password"), stored["password"]):
-            sessions.record_failure(client)
-            raise Problem(HTTPStatus.UNAUTHORIZED, "password")
-        cookie = f"{COOKIE}={sessions.start()}; Path=/; HttpOnly; SameSite=Strict; Max-Age={auth.SESSION_SECONDS}"
+        password = self._text(self._body(), "password")
+        with self.app.auth_lock:
+            if sessions.locked_out(client):
+                raise Problem(HTTPStatus.TOO_MANY_REQUESTS, "locked")
+            stored = self.app.manager.ui()
+            if stored is None or not auth.verify_password(password, stored["password"]):
+                sessions.record_failure(client)
+                raise Problem(HTTPStatus.UNAUTHORIZED, "password")
+            cookie = self._new_session_cookie()
+        self._json({"ok": True}, headers={"Set-Cookie": cookie})
+
+    def _new_session_cookie(self) -> str:
+        cookie = f"{COOKIE}={self.app.sessions.start()}; Path=/; HttpOnly; SameSite=Strict; Max-Age={auth.SESSION_SECONDS}"
         if self.headers.get("X-Forwarded-Proto") == "https":
             # Reached through the tunnel: never send the cookie over plain HTTP.
             cookie += "; Secure"
-        self._json({"ok": True}, headers={"Set-Cookie": cookie})
+        return cookie
+
+    def _change_password(self) -> None:
+        """Replace the password, sign out everyone else and keep this page signed in.
+
+        The current password is asked for, and counted like a login, so a
+        session left open on someone else's device cannot take the account.
+        """
+        sessions = self.app.sessions
+        client = self._client()
+        body = self._body()
+        current, new = self._text(body, "current"), self._text(body, "new")
+        with self.app.auth_lock:
+            if sessions.locked_out(client):
+                raise Problem(HTTPStatus.TOO_MANY_REQUESTS, "locked")
+            if not auth.verify_password(current, self.app.manager.ui()["password"]):
+                sessions.record_failure(client)
+                raise Problem(HTTPStatus.FORBIDDEN, "current_password")
+            if len(new) < auth.MIN_PASSWORD_LENGTH:
+                raise Problem(HTTPStatus.BAD_REQUEST, "short_password")
+            self.app.manager.set_password(new)
+            sessions.end_all()
+            cookie = self._new_session_cookie()
+        # Sessions are already ended; only now wait for Telegram or the bucket.
+        # The page shows any destination that still holds the old password.
+        self._json({"ok": True, "backup": self.app.manager.back_up()}, headers={"Set-Cookie": cookie})
 
     def _client(self) -> str:
         """Who is signing in, for counting wrong passwords.
