@@ -137,6 +137,14 @@ curl -s -m 3 -o /dev/null "http://$HOST_IP:51821/" && fail "the web interface an
 in_client curl -s -m 5 -o /dev/null -w '%{http_code}' "$UI_URL/api/state" | grep -q 401 ||
   fail "the web interface shows data without signing in"
 
+step "Update over a running web interface"
+ui_pid="$(systemctl show -p MainPID --value byteguard-ui)"
+bash "$INSTALLER" --non-interactive
+[[ "$(systemctl show -p MainPID --value byteguard-ui)" != "$ui_pid" ]] ||
+  fail "updating did not restart the web interface"
+web_works || fail "the web interface does not work after an update"
+reaches_server || fail "updating dropped the connection"
+
 step "Back up, wipe the server and restore from the backup file"
 byteguard backup
 backup_copy="$(mktemp)"

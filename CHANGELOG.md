@@ -1,12 +1,15 @@
 # Changelog
 
-## Unreleased
+## 2.1.0 (2026-10-01)
 
 ### Added
 
 - **Change password** in the web interface. It asks for the current
   password, counts wrong guesses like wrong sign-ins, and signs out every
   other open session.
+
+- Running the installer on a server that is already set up restarts the
+  web interface, so it runs the new version straight away.
 
 ### Security
 

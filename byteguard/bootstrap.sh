@@ -125,6 +125,12 @@ main() {
   fi
   if [[ -f $STATE_FILE ]]; then
     msg "This server is already set up, so only the program was updated."
+    # The web interface runs the program it started with; restart it, if it
+    # is running, so it runs the new one. Open sessions end with it.
+    if systemctl is-active --quiet byteguard-ui; then
+      systemctl restart byteguard-ui
+      msg "The web interface was restarted; sign in again."
+    fi
     msg "Run 'sudo byteguard' to manage it."
     return
   fi
