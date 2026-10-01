@@ -55,5 +55,14 @@
   "s3_on": "Every backup is uploaded to your bucket.",
   "s3_not_set": "Not connected.",
   "s3_connected": "Connected. The first backup was uploaded as {key}.",
-  "s3_off": "Stop uploading to S3"
+  "s3_off": "Stop uploading to S3",
+  "change_password": "Change password",
+  "current_password": "Current password",
+  "new_password": "New password",
+  "repeat_password": "New password again",
+  "password_help": "At least 8 characters. Changing it signs out every other open session.",
+  "password_changed": "Password changed. Other sessions were signed out.",
+  "error_current_password": "The current password is wrong.",
+  "error_short_password": "The new password is shorter than 8 characters.",
+  "error_passwords_differ": "The two new passwords do not match."
 }

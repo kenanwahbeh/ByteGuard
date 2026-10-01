@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Change password** in the web interface. It asks for the current
+  password, counts wrong guesses like wrong sign-ins, and signs out every
+  other open session.
+
 ## 2.0.0 (2026-09-30)
 
 Version 2 is a rewrite from scratch. Nothing from version 1 carries over,

@@ -128,8 +128,13 @@ English or Arabic, and the button in the top corner switches between them.
 The interface runs as its own service with a read-only view of the system
 apart from ByteGuard's files. Eight wrong passwords from the same address
 lock sign-in from that address for five minutes; other addresses, yours
-included, are not affected. Running `ui setup` again changes the password and signs everyone
-out.
+included, are not affected.
+
+To change the password, use **Change password** at the bottom of the page.
+It asks for the current password, and wrong guesses there count like wrong
+sign-ins. Every other open session is signed out. If the password is
+forgotten, run `sudo byteguard ui setup` on the server to set a new one;
+that signs everyone out.
 
 ### On your own domain
 

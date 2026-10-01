@@ -168,6 +168,68 @@ class LoginTest(WebTestCase):
         self.assertEqual(self.manager.devices(), [])
 
 
+class ChangePasswordTest(WebTestCase):
+    NEW = "battery staple"
+
+    def setUp(self):
+        super().setUp()
+        self.login()
+
+    def change(self, current=PASSWORD, new=NEW, **options):
+        return self.request("POST", "/api/password", {"current": current, "new": new}, **options)
+
+    def test_the_new_password_works_and_the_old_one_no_longer_does(self):
+        response, _ = self.change()
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(self.request("POST", "/api/login", {"password": PASSWORD}, cookie=False)[0].status, 401)
+        self.assertEqual(self.request("POST", "/api/login", {"password": self.NEW}, cookie=False)[0].status, 200)
+
+    def test_other_sessions_are_signed_out_but_this_page_stays_signed_in(self):
+        other = self.request("POST", "/api/login", {"password": PASSWORD}, cookie=False)[0]
+        other_cookie = other.headers["Set-Cookie"].split(";")[0]
+
+        response, _ = self.change()
+        self.cookie = response.headers["Set-Cookie"].split(";")[0]
+
+        self.assertEqual(self.request("GET", "/api/state")[0].status, 200)
+        self.assertEqual(self.request("GET", "/api/state", headers={"Cookie": other_cookie}, cookie=False)[0].status, 401)
+
+    def test_a_wrong_current_password_changes_nothing(self):
+        response, body = self.change(current="wrong")
+
+        self.assertEqual((response.status, body["error"]), (403, "current_password"))
+        self.assertTrue(auth.verify_password(PASSWORD, self.manager.ui()["password"]))
+        self.assertEqual(self.request("GET", "/api/state")[0].status, 200)
+
+    def test_guessing_the_current_password_is_cut_off_like_a_login(self):
+        for _ in range(auth.MAX_FAILURES):
+            self.change(current="wrong")
+
+        response, body = self.change()
+
+        self.assertEqual((response.status, body["error"]), (429, "locked"))
+        self.assertTrue(auth.verify_password(PASSWORD, self.manager.ui()["password"]))
+
+    def test_a_short_new_password_is_refused(self):
+        response, body = self.change(new="short")
+
+        self.assertEqual((response.status, body["error"]), (400, "short_password"))
+        self.assertTrue(auth.verify_password(PASSWORD, self.manager.ui()["password"]))
+
+    def test_it_needs_a_session_and_the_header_a_browser_cannot_forge(self):
+        self.assertEqual(self.change(cookie=False)[0].status, 401)
+        self.assertEqual(self.change(csrf=False)[0].status, 403)
+        self.assertTrue(auth.verify_password(PASSWORD, self.manager.ui()["password"]))
+
+    def test_a_backup_is_made_with_the_new_password(self):
+        self.change()
+
+        written = open(self.manager.last_backup["local"]["path"]).read()
+        self.assertIn(self.manager.ui()["password"]["hash"], written)
+        self.assertTrue(auth.verify_password(self.NEW, self.manager.ui()["password"]))
+
+
 class DevicesApiTest(WebTestCase):
     def setUp(self):
         super().setUp()

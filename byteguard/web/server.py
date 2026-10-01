@@ -43,6 +43,7 @@ DEVICE = r"(?P<name>[A-Za-z0-9][A-Za-z0-9_-]{0,31})"
 ROUTES = [
     ("POST", r"/api/login", "login", False),
     ("POST", r"/api/logout", "logout", True),
+    ("POST", r"/api/password", "change_password", True),
     ("GET", r"/api/state", "state", True),
     ("POST", r"/api/devices", "add_device", True),
     ("GET", rf"/api/devices/{DEVICE}", "device", True),
@@ -166,11 +167,35 @@ class Handler(BaseHTTPRequestHandler):
         if stored is None or not auth.verify_password(self._text(self._body(), "password"), stored["password"]):
             sessions.record_failure(client)
             raise Problem(HTTPStatus.UNAUTHORIZED, "password")
-        cookie = f"{COOKIE}={sessions.start()}; Path=/; HttpOnly; SameSite=Strict; Max-Age={auth.SESSION_SECONDS}"
+        self._json({"ok": True}, headers={"Set-Cookie": self._new_session_cookie()})
+
+    def _new_session_cookie(self) -> str:
+        cookie = f"{COOKIE}={self.app.sessions.start()}; Path=/; HttpOnly; SameSite=Strict; Max-Age={auth.SESSION_SECONDS}"
         if self.headers.get("X-Forwarded-Proto") == "https":
             # Reached through the tunnel: never send the cookie over plain HTTP.
             cookie += "; Secure"
-        self._json({"ok": True}, headers={"Set-Cookie": cookie})
+        return cookie
+
+    def _change_password(self) -> None:
+        """Replace the password, sign out everyone else and keep this page signed in.
+
+        The current password is asked for, and counted like a login, so a
+        session left open on someone else's device cannot take the account.
+        """
+        sessions = self.app.sessions
+        client = self._client()
+        if sessions.locked_out(client):
+            raise Problem(HTTPStatus.TOO_MANY_REQUESTS, "locked")
+        body = self._body()
+        current, new = self._text(body, "current"), self._text(body, "new")
+        if not auth.verify_password(current, self.app.manager.ui()["password"]):
+            sessions.record_failure(client)
+            raise Problem(HTTPStatus.FORBIDDEN, "current_password")
+        if len(new) < auth.MIN_PASSWORD_LENGTH:
+            raise Problem(HTTPStatus.BAD_REQUEST, "short_password")
+        self.app.manager.set_password(new)
+        sessions.end_all()
+        self._json({"ok": True}, headers={"Set-Cookie": self._new_session_cookie()})
 
     def _client(self) -> str:
         """Who is signing in, for counting wrong passwords.

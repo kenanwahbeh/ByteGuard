@@ -53,7 +53,13 @@ function notify(text, isError = false) {
 
 function explain(error) {
   if (error.code === "login") return showLogin();
-  const known = { password: "error_password", locked: "error_locked", network: "error_network" };
+  const known = {
+    password: "error_password",
+    current_password: "error_current_password",
+    short_password: "error_short_password",
+    locked: "error_locked",
+    network: "error_network",
+  };
   // A refusal from the server carries its own explanation.
   notify(error.code === "refused" ? error.message : t(known[error.code] || "error_generic"), true);
 }
@@ -284,6 +290,20 @@ $("s3-off").addEventListener("click", async () => {
   try {
     await api("DELETE", "/api/backup/s3");
     await refresh();
+  } catch (error) {
+    explain(error);
+  }
+});
+
+$("password-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const fields = ["current-password", "new-password", "repeat-password"].map($);
+  const [current, fresh, repeat] = fields.map((field) => field.value);
+  if (fresh !== repeat) return notify(t("error_passwords_differ"), true);
+  try {
+    await api("POST", "/api/password", { current, new: fresh });
+    for (const field of fields) field.value = "";
+    notify(t("password_changed"));
   } catch (error) {
     explain(error);
   }
