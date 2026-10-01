@@ -26,6 +26,8 @@ STATIC_TYPES = {
 }
 COOKIE = "byteguard_session"
 MAX_BODY = 64 * 1024
+# A client that stops sending mid-request is dropped instead of holding a thread.
+REQUEST_TIMEOUT_SECONDS = 30
 # Browsers cannot add this header to a cross-site form or image request, so
 # requiring it on every change stops other sites from acting as the admin.
 CSRF_HEADER = "X-ByteGuard"
@@ -86,6 +88,7 @@ class Handler(BaseHTTPRequestHandler):
     app: App
     server_version = "ByteGuard"
     sys_version = ""
+    timeout = REQUEST_TIMEOUT_SECONDS
 
     def log_message(self, format, *args):
         # Keep the journal free of request lines, which include device names.
@@ -103,6 +106,7 @@ class Handler(BaseHTTPRequestHandler):
     def _handle(self, method: str) -> None:
         path = self.path.split("?", 1)[0]
         try:
+            self._check_host()
             if path.startswith("/api/"):
                 self._api(method, path)
             elif method == "GET":
@@ -116,6 +120,22 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             # Answer instead of dropping the connection; details stay out of the response.
             self._json({"error": "server"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _check_host(self) -> None:
+        """Refuse requests addressed to any other name (DNS rebinding).
+
+        A website a connected device visits could point its own name at the
+        VPN address and then talk to this server from that device's browser.
+        Browsers send the name they looked up, so only the VPN address is
+        accepted from devices. Requests from this server itself come through
+        a tunnel, which Cloudflare routes by the name configured for it.
+        """
+        address, port = self.server.server_address[:2]
+        if self.client_address[0] == address:
+            return
+        allowed = {f"{address}:{port}"} | ({address} if port == 80 else set())
+        if (self.headers.get("Host") or "").lower() not in allowed:
+            raise Problem(HTTPStatus.MISDIRECTED_REQUEST, "host")
 
     # Static files
 
@@ -146,7 +166,12 @@ class Handler(BaseHTTPRequestHandler):
         return cookie[COOKIE].value if COOKIE in cookie else None
 
     def _body(self) -> dict:
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            raise Problem(HTTPStatus.BAD_REQUEST, "length") from None
+        if length < 0:
+            raise Problem(HTTPStatus.BAD_REQUEST, "length")
         if length > MAX_BODY:
             raise Problem(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "too_large")
         try:

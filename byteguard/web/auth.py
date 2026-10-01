@@ -66,7 +66,8 @@ class Sessions:
         if expiry is None:
             return False
         if expiry < self._clock():
-            del self._sessions[token]
+            # pop, not del: two requests may find the same expired session.
+            self._sessions.pop(token, None)
             return False
         return True
 

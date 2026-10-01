@@ -1,7 +1,9 @@
 import http.client
 import json
+import socket
 import threading
 import unittest
+from pathlib import Path
 
 from byteguard.errors import ByteGuardError
 from byteguard.manager import Manager
@@ -169,6 +171,45 @@ class LoginTest(WebTestCase):
         self.assertEqual(self.manager.devices(), [])
 
 
+class RequestCheckTest(WebTestCase):
+    """Requests from a device in the VPN, which connects from an address of its own."""
+
+    def raw(self, request: bytes, source="127.0.0.2") -> bytes:
+        with socket.create_connection(("127.0.0.1", self.httpd.server_address[1]), timeout=10,
+                                      source_address=(source, 0)) as connection:
+            connection.sendall(request)
+            answer = b""
+            while chunk := connection.recv(4096):
+                answer += chunk
+            return answer
+
+    def get(self, host: str, source="127.0.0.2") -> bytes:
+        return self.raw(f"GET / HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n".encode(), source)
+
+    def test_a_device_reaches_the_page_at_the_vpn_address(self):
+        self.assertTrue(self.get(f"127.0.0.1:{self.httpd.server_address[1]}").startswith(b"HTTP/1.0 200"))
+
+    def test_another_name_pointed_at_the_vpn_address_is_refused(self):
+        for host in ("evil.example", f"evil.example:{self.httpd.server_address[1]}", "127.0.0.1", ""):
+            with self.subTest(host=host):
+                self.assertTrue(self.get(host).startswith(b"HTTP/1.0 421"))
+
+    def test_the_tunnel_on_this_server_may_use_its_public_name(self):
+        self.assertTrue(self.get("vpn.example.com", source="127.0.0.1").startswith(b"HTTP/1.0 200"))
+
+    def test_a_negative_or_garbled_length_is_refused_instead_of_read_forever(self):
+        for length in (b"-1", b"abc"):
+            with self.subTest(length=length):
+                answer = self.raw(
+                    b"POST /api/login HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nX-ByteGuard: 1\r\nContent-Length: %s\r\n\r\n"
+                    % (self.httpd.server_address[1], length)
+                )
+                self.assertTrue(answer.startswith(b"HTTP/1.0 400"), answer)
+
+    def test_a_client_that_stops_sending_is_dropped(self):
+        self.assertEqual(server.Handler.timeout, server.REQUEST_TIMEOUT_SECONDS)
+
+
 class ChangePasswordTest(WebTestCase):
     NEW = "battery staple"
 
@@ -252,7 +293,7 @@ class ChangePasswordTest(WebTestCase):
     def test_a_backup_is_made_with_the_new_password(self):
         self.change()
 
-        written = open(self.manager.last_backup["local"]["path"]).read()
+        written = Path(self.manager.last_backup["local"]["path"]).read_text()
         self.assertIn(self.manager.ui()["password"]["hash"], written)
         self.assertTrue(auth.verify_password(self.NEW, self.manager.ui()["password"]))
 
