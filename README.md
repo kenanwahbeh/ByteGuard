@@ -240,6 +240,22 @@ the nickname **Kinan125**.
   <img src="assets/binance.jpg" alt="Binance Pay QR code - Kinan125" width="280">
 </p>
 
+## Byte Balance Technology projects
+
+ByteGuard is one of eight projects from Byte Balance Technology. Every project
+is named `Byte<Name>`, and its repository has the same name.
+
+| Project | What it is |
+|---|---|
+| [ByteBridge](https://github.com/kenanwahbeh/ByteBridge) | HTTP gateway for a customer's databases |
+| [ByteHousing](https://github.com/kenanwahbeh/ByteHousing) | Residential associations system |
+| [ByteBalanceTech](https://github.com/kenanwahbeh/ByteBalanceTech) | Main site |
+| [ByteGuard](https://github.com/kenanwahbeh/ByteGuard) | WireGuard management (this repository) |
+| [ByteBill](https://github.com/kenanwahbeh/ByteBill) | Billing system |
+| [ByteFetch](https://github.com/kenanwahbeh/ByteFetch) | Telegram bot that fetches what is sent to it, using AI |
+| [ByteStore](https://github.com/kenanwahbeh/ByteStore) | Online store |
+| [ByteReport](https://github.com/kenanwahbeh/ByteReport) | Business reporting (formerly Noport) |
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
