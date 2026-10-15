@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ByteGuard — a WireGuard VPN server with one command</title>
+  <meta name="description" content="ByteGuard sets up a WireGuard VPN server on your own machine with one command, lets you manage its devices from a web page, and brings the whole setup back from a single backup file.">
+  <link rel="alternate" hreflang="ar" href="../">
+  <link rel="alternate" hreflang="en" href="./">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="./">ByteGuard</a>
+      <nav class="links" aria-label="Site">
+        <a class="optional" href="#install">Install</a>
+        <a class="optional" href="#commands">Commands</a>
+        <a class="optional" href="#security">Security</a>
+        <a href="https://github.com/kenanwahbeh/ByteGuard">GitHub</a>
+        <a class="lang" href="../" hreflang="ar" lang="ar">العربية</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="hero">
+      <h1>A WireGuard VPN server on your own machine, with one command</h1>
+      <p class="lead">ByteGuard sets up a WireGuard VPN server with one command, lets you manage its devices from a web page, and brings the whole setup back from a single backup file after a server reinstall.</p>
+      <pre><code>curl -fsSL https://bytebalancetech.com/byteguard.sh -o byteguard.sh
+sudo bash byteguard.sh</code></pre>
+      <div class="buttons">
+        <a class="button primary" href="https://github.com/kenanwahbeh/ByteGuard/releases/latest">Latest release</a>
+        <a class="button" href="https://github.com/kenanwahbeh/ByteGuard#readme">Documentation</a>
+        <a class="button" href="https://github.com/kenanwahbeh/ByteGuard/blob/main/CHANGELOG.md">Changelog</a>
+      </div>
+      <figure>
+        <img src="../assets/screenshots/devices-en.png" alt="The web interface: devices with their connection status and traffic" width="620">
+      </figure>
+    </div>
+
+    <section id="features">
+      <h2>What it does</h2>
+      <ul class="features">
+        <li><strong>One installer file</strong>For Ubuntu 22.04+ and Debian 12+. The program is embedded in it as plain text, so you can read everything it installs.</li>
+        <li><strong>Guided setup</strong>It finds the network card that faces the internet and the server's public address, confirms both with you, and asks for the port (default <code>51820</code>).</li>
+        <li><strong>Full tunnel</strong>All of each device's traffic goes through the server, with <code>PersistentKeepalive = 25</code> and <code>MTU = 1420</code>.</li>
+        <li><strong>Device management</strong>Add, remove and list devices, show a QR code again at any time, and switch a device off without deleting it.</li>
+        <li><strong>A backup after every change</strong>One runnable file: run it on a fresh server and the VPN comes back with the same keys. It can also go to Telegram and S3-compatible storage such as Cloudflare R2.</li>
+        <li><strong>Web interface in Arabic and English</strong>Devices, QR codes, who is connected, backups and Telegram. It listens only on the server's address inside the VPN.</li>
+        <li><strong>Your own domain, optionally</strong>The web interface through a Cloudflare Tunnel, with no port opened. ByteGuard creates a tunnel of its own and never touches an existing cloudflared.</li>
+        <li><strong>Fits in with your firewall</strong>ufw rules when ufw is active, iptables rules otherwise. It never flushes a chain, and uninstalling removes exactly what it added.</li>
+      </ul>
+      <p>Everything runs on your server and your own accounts. ByteGuard collects no data, and your keys and devices go nowhere except the backup destinations you choose.</p>
+    </section>
+
+    <section id="install">
+      <h2>Install</h2>
+      <p>On a fresh Ubuntu 22.04+ or Debian 12+ server:</p>
+      <pre><code>curl -fsSL https://bytebalancetech.com/byteguard.sh -o byteguard.sh
+sudo bash byteguard.sh</code></pre>
+      <p>This address redirects to the latest release on GitHub. You can also download from GitHub directly:</p>
+      <pre><code>curl -fsSL https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh -o byteguard.sh</code></pre>
+      <p>To check the file before running it, compare it with the checksum published with the release:</p>
+      <pre><code>curl -fsSLO https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh.sha256
+sha256sum -c byteguard.sh.sha256</code></pre>
+      <p>Version 1, the old single-file script, stays available as release <a href="https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0">v1.0.0</a>; version 2 does not import its data.</p>
+
+      <h3>Update</h3>
+      <p>Download the new installer and run it on the server, the same way as installing. On a server that is already set up it replaces only the program: the keys, the devices and the settings stay, and connected devices stay connected. If the web interface is running it is restarted so it runs the new version, which signs everyone out of it.</p>
+    </section>
+
+    <section id="quick-start">
+      <h2>Quick start</h2>
+      <p>The installer asks its questions, starts the VPN and prints the first device's configuration and QR code. To skip the questions, pass <code>--non-interactive</code> with any of <code>--iface</code>, <code>--endpoint</code>, <code>--port</code> and <code>--first-device</code>; whatever is left out is detected.</p>
+      <p>The VPN uses the private network <code>10.66.66.0/24</code> unless you pass another one, for example <code>--subnet 10.11.12.0/24</code>. The server takes the first address in it and devices get the ones after.</p>
+    </section>
+
+    <section id="commands">
+      <h2>Commands</h2>
+      <p>Afterwards, <code>sudo byteguard</code> opens a menu. The same actions are commands:</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>sudo byteguard add NAME</code></td><td>Add a device and show its configuration and QR code</td></tr>
+            <tr><td><code>sudo byteguard show NAME</code></td><td>Show a device's configuration and QR code again</td></tr>
+            <tr><td><code>sudo byteguard list</code></td><td>List the devices</td></tr>
+            <tr><td><code>sudo byteguard status</code></td><td>Show which devices are connected and their traffic</td></tr>
+            <tr><td><code>sudo byteguard disable NAME</code></td><td>Stop a device from connecting without deleting it</td></tr>
+            <tr><td><code>sudo byteguard enable NAME</code></td><td>Let a disabled device connect again</td></tr>
+            <tr><td><code>sudo byteguard remove NAME</code></td><td>Delete a device</td></tr>
+            <tr><td><code>sudo byteguard port NUMBER</code></td><td>Move the VPN to another UDP port; every device then needs its configuration again</td></tr>
+            <tr><td><code>sudo byteguard ui setup</code></td><td>Turn the web interface on and set its password (<code>ui off</code> turns it off)</td></tr>
+            <tr><td><code>sudo byteguard ui tunnel</code></td><td>Serve the web interface on your own domain through Cloudflare (<code>--off</code> stops it)</td></tr>
+            <tr><td><code>sudo byteguard backup</code></td><td>Make a backup now</td></tr>
+            <tr><td><code>sudo byteguard backup telegram</code></td><td>Send every backup to a Telegram chat through your own bot (<code>--off</code> stops it)</td></tr>
+            <tr><td><code>sudo byteguard backup s3</code></td><td>Upload every backup to S3-compatible storage such as Cloudflare R2 (<code>--off</code> stops it)</td></tr>
+            <tr><td><code>sudo byteguard uninstall</code></td><td>Remove the VPN, its keys and ByteGuard</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The server's keys and the devices are stored in <code>/etc/byteguard/state.json</code>, readable only by root. <code>/etc/wireguard/wg0.conf</code> is generated from it and should not be edited.</p>
+    </section>
+
+    <section id="web">
+      <h2>Web interface</h2>
+      <p><code>sudo byteguard ui setup</code> asks for a password and turns the web interface on at <code>http://&lt;server's VPN address&gt;:51821</code>, for example <code>http://10.66.66.1:51821</code>. Open it from a device that is connected to the VPN; from anywhere else the address does not answer. The page is in English or Arabic, and the button in the top corner switches between them.</p>
+      <figure>
+        <img src="../assets/screenshots/web-en.png" alt="The whole web interface: devices, backups, Telegram and S3 storage" width="520" loading="lazy">
+      </figure>
+      <p>Eight wrong passwords from the same address lock sign-in from that address for five minutes; other addresses, yours included, are not affected. To change the password, use <strong>Change password</strong> at the bottom of the page; every other open session is signed out. If the password is forgotten, run <code>sudo byteguard ui setup</code> on the server to set a new one.</p>
+
+      <h3>On your own domain</h3>
+      <p><code>sudo byteguard ui tunnel</code> serves the same page at an address such as <code>https://vpn.example.com</code> through a Cloudflare Tunnel, so you can open it without being connected to the VPN and without opening a port. It needs a domain in your own Cloudflare account; the free plan is enough.</p>
+      <p>It installs <code>cloudflared</code> from Cloudflare's signed package repository if it is missing, prints a link to sign in to Cloudflare and choose the domain, then creates a tunnel and runs it as <code>byteguard-tunnel.service</code>. The sign-in certificate, which could manage the whole domain, is deleted straight away; only that one tunnel's credentials stay on the server.</p>
+      <p class="note">Once it is on a public address, anyone who knows it can reach the sign-in page. Use a strong password, and consider putting Cloudflare Access in front of it.</p>
+    </section>
+
+    <section id="backups">
+      <h2>Backups and restore</h2>
+      <p>Every change (a device added, removed, enabled or disabled, the port moved) rewrites the backup file in <code>/var/backups/byteguard/</code> straight away. A file on the server does not survive the server being wiped, so send it somewhere else as well:</p>
+      <ul>
+        <li><code>sudo byteguard backup telegram</code> asks for the token of a bot you create with @BotFather and delivers every new backup to your chat.</li>
+        <li><code>sudo byteguard backup s3</code> uploads every backup to S3-compatible storage (Cloudflare R2, AWS S3, Backblaze B2 and others). A test upload is made before anything is saved, and the newest 10 backups are kept.</li>
+      </ul>
+      <p>To restore, copy the backup file to a fresh server and run it:</p>
+      <pre><code>sudo bash byteguard-backup-NAME.sh</code></pre>
+      <p>Devices reconnect on their own when the new server has the same public address, or when they were set up with a host name that you point at the new server. If the address changed, pass <code>--endpoint NEW_ADDRESS</code>; every device then needs its configuration again.</p>
+      <p class="note"><strong>A backup is not encrypted.</strong> It holds the server's key, every device's key, the Telegram bot token and the storage keys. Anyone who gets the file can connect to your VPN, so keep it, and the chat it is sent to, private.</p>
+    </section>
+
+    <section id="security">
+      <h2>Security model</h2>
+      <ul>
+        <li><strong>What it stores:</strong> everything lives on your server. <code>/etc/byteguard/state.json</code>, readable only by root, holds the WireGuard keys, the web interface's password hash (scrypt), and the credentials of the backup destinations and the tunnel.</li>
+        <li><strong>What it exposes:</strong> WireGuard on the UDP port you chose. The web interface listens only on the server's VPN address, and the firewall rule that admits it names the VPN interface.</li>
+        <li><strong>DNS rebinding:</strong> the web interface answers only requests addressed to the VPN address, or that arrive through the tunnel on the server itself. Requests are limited in size and dropped after 30 seconds without progress.</li>
+        <li><strong>Least privilege:</strong> the web interface service keeps a single capability (managing network interfaces) and sees the system read-only apart from ByteGuard's own directories.</li>
+        <li><strong>What it changes:</strong> it adds firewall rules next to the existing ones and removes exactly those on uninstall. It never turns IP forwarding off, and never touches a WireGuard setup or a Cloudflare tunnel it did not create.</li>
+        <li><strong>Outside connections:</strong> no telemetry. During setup it asks <code>api.ipify.org</code> (or <code>icanhazip.com</code>) to suggest the public address; the tunnel feature talks to Cloudflare. None of these carries your data.</li>
+      </ul>
+      <p>Read <a href="https://github.com/kenanwahbeh/ByteGuard/blob/main/SECURITY.md">SECURITY.md</a> for the details. To report a vulnerability, use <a href="https://github.com/kenanwahbeh/ByteGuard/security">Report a vulnerability</a> on the repository's Security tab, not a public issue.</p>
+    </section>
+
+    <section id="development">
+      <h2>Development</h2>
+      <p>The program is Python 3.10+ and uses only the standard library. To build the installer from source:</p>
+      <pre><code>git clone https://github.com/kenanwahbeh/ByteGuard.git
+cd ByteGuard
+python3 tools/build.py                  # writes dist/byteguard.sh
+sudo bash dist/byteguard.sh</code></pre>
+      <pre><code>python3 -m unittest discover -s tests   # unit tests, safe to run anywhere</code></pre>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <img src="../assets/logo.png" alt="Byte Balance Technology logo" width="220" loading="lazy">
+      <p>ByteGuard is released under the <a href="https://github.com/kenanwahbeh/ByteGuard/blob/main/LICENSE">MIT license</a>. <a href="https://github.com/kenanwahbeh/ByteGuard">Source on GitHub</a> · <a href="https://github.com/kenanwahbeh/ByteGuard/releases">Releases</a></p>
+      <p>WireGuard is a registered trademark of Jason A. Donenfeld. ByteGuard is an independent project and is not affiliated with or endorsed by the WireGuard project.</p>
+    </div>
+  </footer>
+</body>
+</html>
