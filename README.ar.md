@@ -118,6 +118,21 @@ sudo bash byteguard-backup-NAME.sh
   <img src="assets/binance.jpg" alt="رمز Binance Pay - Kinan125" width="280">
 </p>
 
+## مشاريع Byte Balance Technology
+
+ByteGuard واحد من ثمانية مشاريع لشركة Byte Balance Technology. كل مشروع باسم `Byte<Name>`، ومستودعه بالاسم نفسه.
+
+| المشروع | الغرض |
+|---|---|
+| [ByteBridge](https://github.com/kenanwahbeh/ByteBridge) | بوابة HTTP لقواعد بيانات العميل |
+| [ByteHousing](https://github.com/kenanwahbeh/ByteHousing) | نظام الجمعيات السكنية |
+| [ByteBalanceTech](https://github.com/kenanwahbeh/ByteBalanceTech) | الموقع الرئيسي |
+| [ByteGuard](https://github.com/kenanwahbeh/ByteGuard) | إدارة WireGuard (هذا المستودع) |
+| [ByteBill](https://github.com/kenanwahbeh/ByteBill) | نظام الفوترة |
+| [ByteFetch](https://github.com/kenanwahbeh/ByteFetch) | بوت تيليغرام يجلب بالذكاء الاصطناعي ما يُرسل إليه |
+| [ByteStore](https://github.com/kenanwahbeh/ByteStore) | المتجر الإلكتروني |
+| [ByteReport](https://github.com/kenanwahbeh/ByteReport) | تقارير الأعمال (سابقاً Noport) |
+
 ## الترخيص
 
 MIT، والتفاصيل في ملف [LICENSE](LICENSE).
