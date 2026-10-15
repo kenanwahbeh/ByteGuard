@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ByteGuard — خادم WireGuard بأمر واحد</title>
+  <meta name="description" content="ByteGuard ينصّب خادم WireGuard بأمر واحد على خادمك، ويُدير أجهزتك من صفحة ويب، ويستعيد إعداداتك كاملة من ملف نسخة احتياطية واحد.">
+  <link rel="alternate" hreflang="ar" href="./">
+  <link rel="alternate" hreflang="en" href="en/">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="./">ByteGuard</a>
+      <nav class="links" aria-label="الموقع">
+        <a class="optional" href="#install">التنصيب</a>
+        <a class="optional" href="#commands">الأوامر</a>
+        <a class="optional" href="#security">الأمان</a>
+        <a href="https://github.com/kenanwahbeh/ByteGuard">GitHub</a>
+        <a class="lang" href="en/" hreflang="en" lang="en">English</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="hero">
+      <h1>خادم WireGuard على خادمك، بأمر واحد</h1>
+      <p class="lead">ByteGuard ينصّب خادم WireGuard بأمر واحد، ويُدير أجهزتك من صفحة ويب، ويستعيد إعداداتك كاملة من ملف نسخة احتياطية واحد بعد إعادة تثبيت الخادم.</p>
+      <pre><code>curl -fsSL https://bytebalancetech.com/byteguard.sh -o byteguard.sh
+sudo bash byteguard.sh</code></pre>
+      <div class="buttons">
+        <a class="button primary" href="https://github.com/kenanwahbeh/ByteGuard/releases/latest">آخر إصدار</a>
+        <a class="button" href="https://github.com/kenanwahbeh/ByteGuard/blob/main/README.ar.md">التوثيق</a>
+        <a class="button" href="https://github.com/kenanwahbeh/ByteGuard/blob/main/CHANGELOG.md">سجل التغييرات</a>
+      </div>
+      <figure>
+        <img src="assets/screenshots/devices-ar.png" alt="واجهة الويب: الأجهزة وحالة اتصالها واستهلاكها" width="620">
+      </figure>
+    </div>
+
+    <section id="features">
+      <h2>ما يقدّمه</h2>
+      <ul class="features">
+        <li><strong>ملف تنصيب واحد</strong>لنظام Ubuntu 22.04 أو أحدث، أو Debian 12 أو أحدث. البرنامج مضمّن فيه نصاً مقروءاً، فتستطيع قراءة كل ما ينصّبه.</li>
+        <li><strong>إعداد موجّه</strong>يكتشف بطاقة الشبكة المتصلة بالإنترنت وعنوان الخادم العام، ويطلب تأكيدهما، ثم يسأل عن المنفذ (الافتراضي <code>51820</code>).</li>
+        <li><strong>كل حركة بيانات الأجهزة عبر الخادم</strong>مع <code>PersistentKeepalive = 25</code> و<code>MTU = 1420</code>.</li>
+        <li><strong>إدارة الأجهزة</strong>أضف الأجهزة واحذفها واعرض قائمتها، واعرض الرمز الضوئي (QR) لأي جهاز في أي وقت، وعطّل جهازاً دون حذفه.</li>
+        <li><strong>نسخة احتياطية بعد كل تعديل</strong>ملف واحد قابل للتشغيل: شغّله على خادم جديد فتعود الشبكة بالمفاتيح نفسها. ويمكن إرساله إلى Telegram ورفعه إلى تخزين متوافق مع S3 مثل Cloudflare R2.</li>
+        <li><strong>واجهة ويب بالعربية والإنجليزية</strong>الأجهزة ورموزها والمتصلون منها والنسخ الاحتياطية وTelegram. تعمل على عنوان الخادم داخل الشبكة الافتراضية فقط.</li>
+        <li><strong>نطاقك الخاص، اختيارياً</strong>الواجهة عبر Cloudflare Tunnel دون فتح أي منفذ. يُنشئ البرنامج نفقاً خاصاً به ولا يمسّ أي cloudflared موجود.</li>
+        <li><strong>احترام الجدار الناري</strong>قواعد ufw إن كان مفعّلاً، وقواعد iptables في غير ذلك. لا يمسح أي سلسلة قواعد، وعند الإزالة يحذف ما أضافه فقط.</li>
+      </ul>
+      <p>كل شيء يعمل على خادمك وحساباتك. البرنامج لا يجمع أي بيانات، والمفاتيح والأجهزة لا تغادر الخادم إلا إلى وجهات النسخ الاحتياطي التي تختارها.</p>
+    </section>
+
+    <section id="install">
+      <h2>التنصيب</h2>
+      <p>على خادم جديد يعمل بنظام Ubuntu 22.04 أو أحدث، أو Debian 12 أو أحدث:</p>
+      <pre><code>curl -fsSL https://bytebalancetech.com/byteguard.sh -o byteguard.sh
+sudo bash byteguard.sh</code></pre>
+      <p>يحوّل هذا العنوان إلى آخر إصدار على GitHub. لتحميل الملف مباشرة من GitHub:</p>
+      <pre><code>curl -fsSL https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh -o byteguard.sh</code></pre>
+      <p>للتحقق من الملف قبل تشغيله قارنه ببصمة <bdi class="nowrap">SHA-256</bdi> المنشورة مع الإصدار:</p>
+      <pre><code>curl -fsSLO https://github.com/kenanwahbeh/ByteGuard/releases/latest/download/byteguard.sh.sha256
+sha256sum -c byteguard.sh.sha256</code></pre>
+      <p>الإصدار الأول، أي السكربت القديم ذو الملف الواحد، متاح في الإصدار <a href="https://github.com/kenanwahbeh/ByteGuard/releases/tag/v1.0.0">v1.0.0</a>، والإصدار الثاني لا يستورد بياناته.</p>
+
+      <h3>التحديث</h3>
+      <p>نزّل ملف التنصيب الجديد وشغّله على الخادم بالأمرين نفسيهما المستخدمين في التنصيب. على خادم منصّب مسبقاً يُستبدل البرنامج فقط، وتبقى المفاتيح والأجهزة والإعدادات كما هي، وتبقى الأجهزة متصلة. إذا كانت الواجهة تعمل يُعاد تشغيلها لتعمل بالإصدار الجديد، فتُغلق كل جلساتها ويلزم تسجيل الدخول من جديد.</p>
+    </section>
+
+    <section id="quick-start">
+      <h2>البدء السريع</h2>
+      <p>يطرح ملف التنصيب أسئلته، ثم يشغّل الشبكة ويعرض إعدادات الجهاز الأول ورمزه الضوئي. لتخطي الأسئلة مرّر <code>--non-interactive</code> مع ما تريد من <code>--iface</code> و<code>--endpoint</code> و<code>--port</code> و<code>--first-device</code>، ويكتشف البرنامج ما لم تحدّده.</p>
+      <p>تستخدم الشبكة النطاق الخاص <code>10.66.66.0/24</code> ما لم تمرّر غيره، مثل <code>--subnet 10.11.12.0/24</code>. يأخذ الخادم أول عنوان فيه، وتأخذ الأجهزة العناوين التالية.</p>
+    </section>
+
+    <section id="commands">
+      <h2>الأوامر</h2>
+      <p>بعد التنصيب يفتح الأمر <code>sudo byteguard</code> قائمةً، والإجراءات نفسها متاحة أوامرَ مستقلة:</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>الأمر</th><th>الوظيفة</th></tr></thead>
+          <tbody>
+            <tr><td><code>sudo byteguard add NAME</code></td><td>إضافة جهاز وعرض إعداداته ورمزه الضوئي</td></tr>
+            <tr><td><code>sudo byteguard show NAME</code></td><td>عرض إعدادات جهاز ورمزه الضوئي مرة أخرى</td></tr>
+            <tr><td><code>sudo byteguard list</code></td><td>عرض قائمة الأجهزة</td></tr>
+            <tr><td><code>sudo byteguard status</code></td><td>الأجهزة المتصلة واستهلاك كل جهاز</td></tr>
+            <tr><td><code>sudo byteguard disable NAME</code></td><td>منع جهاز من الاتصال دون حذفه</td></tr>
+            <tr><td><code>sudo byteguard enable NAME</code></td><td>السماح لجهاز معطّل بالاتصال من جديد</td></tr>
+            <tr><td><code>sudo byteguard remove NAME</code></td><td>حذف جهاز</td></tr>
+            <tr><td><code>sudo byteguard port NUMBER</code></td><td>نقل الشبكة إلى منفذ UDP آخر، ويحتاج كل جهاز بعدها إلى إعداداته من جديد</td></tr>
+            <tr><td><code>sudo byteguard ui setup</code></td><td>تشغيل الواجهة وتعيين كلمة مرورها (<code>ui off</code> يوقفها)</td></tr>
+            <tr><td><code>sudo byteguard ui tunnel</code></td><td>نشر الواجهة على نطاقك عبر Cloudflare (<code>--off</code> يوقفها)</td></tr>
+            <tr><td><code>sudo byteguard backup</code></td><td>نسخة احتياطية فورية</td></tr>
+            <tr><td><code>sudo byteguard backup telegram</code></td><td>إرسال كل نسخة إلى محادثة Telegram عبر بوت خاص بك (<code>--off</code> يوقفه)</td></tr>
+            <tr><td><code>sudo byteguard backup s3</code></td><td>رفع كل نسخة إلى تخزين متوافق مع S3 مثل Cloudflare R2 (<code>--off</code> يوقفه)</td></tr>
+            <tr><td><code>sudo byteguard uninstall</code></td><td>إزالة الشبكة ومفاتيحها وByteGuard</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>تُحفظ مفاتيح الخادم والأجهزة في <code>/etc/byteguard/state.json</code>، ولا يقرؤه إلا root. يُولَّد الملف <code>/etc/wireguard/wg0.conf</code> منه، فلا تعدّله يدوياً.</p>
+    </section>
+
+    <section id="web">
+      <h2>واجهة الويب</h2>
+      <p>شغّل <code>sudo byteguard ui setup</code> لتعيين كلمة مرور وتشغيل الواجهة على عنوان الخادم داخل الشبكة والمنفذ <code>51821</code>، مثل <code>http://10.66.66.1:51821</code>. افتحها من جهاز متصل بالشبكة، فالعنوان لا يستجيب من أي مكان آخر. الصفحة بالعربية أو الإنجليزية، ويبدّل الزر في الزاوية العلوية بينهما.</p>
+      <p>إذا أُدخلت ثماني كلمات مرور خاطئة من عنوان واحد يُقفل الدخول منه خمس دقائق، دون أن تتأثر العناوين الأخرى، ومنها عنوانك. لتغيير كلمة المرور استخدم «تغيير كلمة المرور» أسفل الصفحة، وتُغلق بعدها كل الجلسات المفتوحة على الأجهزة الأخرى. إذا نسيت كلمة المرور شغّل <code>sudo byteguard ui setup</code> على الخادم لتعيين كلمة جديدة.</p>
+
+      <h3>على نطاقك الخاص</h3>
+      <p>شغّل <code>sudo byteguard ui tunnel</code> لنشر الصفحة نفسها على عنوان مثل <code>https://vpn.example.com</code> عبر Cloudflare Tunnel، فتفتحها دون الاتصال بالشبكة ودون فتح أي منفذ. يتطلب ذلك نطاقاً في حسابك على Cloudflare، والخطة المجانية تكفي.</p>
+      <p>ينصّب البرنامج <code>cloudflared</code> من مستودع حزم Cloudflare الموقّع إن لم يكن موجوداً، ويعرض رابطاً تسجّل منه الدخول إلى Cloudflare وتختار النطاق، ثم يُنشئ نفقاً ويشغّله خدمةً باسم <code>byteguard-tunnel.service</code>. تُحذف شهادة الدخول فوراً لأنها تستطيع إدارة النطاق كله، ولا يبقى على الخادم إلا بيانات اعتماد هذا النفق وحده.</p>
+      <p class="note">بعد نشر الواجهة على عنوان عام يستطيع كل من يعرف العنوان الوصول إلى صفحة الدخول. استخدم كلمة مرور قوية، وفكّر في وضع Cloudflare Access أمامها.</p>
+    </section>
+
+    <section id="backups">
+      <h2>النسخ الاحتياطي والاستعادة</h2>
+      <p>كل تعديل (إضافة جهاز أو حذفه أو تفعيله أو تعطيله، أو نقل المنفذ) يعيد كتابة ملف النسخة في <code>/var/backups/byteguard/</code> فوراً. الملف الموجود على الخادم يضيع إذا مُسح الخادم، فأرسله إلى مكان آخر أيضاً:</p>
+      <ul>
+        <li><code>sudo byteguard backup telegram</code> يطلب رمز بوت تُنشئه عبر ‎@BotFather، ثم يرسل كل نسخة جديدة إلى محادثتك.</li>
+        <li><code>sudo byteguard backup s3</code> يرفع كل نسخة إلى تخزين متوافق مع S3 (Cloudflare R2 وAWS S3 وBackblaze B2 وغيرها). يجري البرنامج رفعاً تجريبياً قبل حفظ الإعدادات، ويحتفظ بأحدث 10 نسخ.</li>
+      </ul>
+      <p>للاستعادة انسخ ملف النسخة الاحتياطية إلى خادم جديد وشغّله:</p>
+      <pre><code>sudo bash byteguard-backup-NAME.sh</code></pre>
+      <p>تتصل الأجهزة تلقائياً إذا احتفظ الخادم الجديد بالعنوان العام نفسه، أو إذا أُعدّت باسم نطاق ووُجّه هذا الاسم إلى الخادم الجديد. إذا تغيّر العنوان أضف <code>--endpoint NEW_ADDRESS</code>، وعندها يحتاج كل جهاز إلى إعداداته من جديد.</p>
+      <p class="note"><strong>النسخة الاحتياطية غير مشفّرة.</strong> تحتوي مفتاح الخادم ومفاتيح كل الأجهزة ورمز بوت Telegram ومفاتيح التخزين. من يحصل عليها يستطيع الاتصال بشبكتك، فاحفظها هي والمحادثة التي تُرسل إليها في مكان خاص.</p>
+    </section>
+
+    <section id="security">
+      <h2>نموذج الأمان</h2>
+      <ul>
+        <li><strong>ما يُخزَّن:</strong> كل شيء على خادمك. يحوي <code>/etc/byteguard/state.json</code>، الذي لا يقرؤه إلا root، مفاتيح WireGuard وبصمة كلمة مرور الواجهة (scrypt) وبيانات اعتماد وجهات النسخ الاحتياطي والنفق.</li>
+        <li><strong>ما يُكشف:</strong> WireGuard على منفذ UDP الذي اخترته. تستمع الواجهة على عنوان الخادم داخل الشبكة فقط، وقاعدة الجدار الناري التي تسمح بها مقيّدة بواجهة الشبكة الافتراضية.</li>
+        <li><strong>الحماية من DNS rebinding:</strong> لا تجيب الواجهة إلا الطلبات الموجّهة إلى عنوان الشبكة الافتراضية، أو الواردة عبر النفق على الخادم نفسه. حجم الطلبات محدود، ويُقطع الطلب بعد 30 ثانية دون تقدّم.</li>
+        <li><strong>أقل الصلاحيات:</strong> تحتفظ خدمة الواجهة بصلاحية واحدة فقط (إدارة واجهات الشبكة)، وترى النظام للقراءة فقط باستثناء مجلدات ByteGuard.</li>
+        <li><strong>ما يغيّره على الخادم:</strong> يضيف قواعد الجدار الناري بجانب القواعد الموجودة ويحذفها هي فقط عند الإزالة. لا يوقف IP forwarding أبداً، ولا يمسّ إعداد WireGuard أو نفق Cloudflare لم يُنشئه.</li>
+        <li><strong>الاتصالات الخارجية:</strong> لا جمع للبيانات. أثناء الإعداد يسأل <code>api.ipify.org</code> (أو <code>icanhazip.com</code>) لاقتراح العنوان العام، وتتصل ميزة النفق بـ Cloudflare، ولا يحمل أي من هذه الطلبات بياناتك.</li>
+      </ul>
+      <p>التفاصيل في <a href="https://github.com/kenanwahbeh/ByteGuard/blob/main/SECURITY.md">SECURITY.md</a>. للإبلاغ عن ثغرة استخدم <a href="https://github.com/kenanwahbeh/ByteGuard/security">Report a vulnerability</a> في تبويب Security في المستودع، لا بلاغاً عاماً.</p>
+    </section>
+
+    <section id="development">
+      <h2>التطوير</h2>
+      <p>البرنامج مكتوب بلغة Python 3.10 أو أحدث، ويعتمد على المكتبة القياسية وحدها. لبناء ملف التنصيب من المصدر:</p>
+      <pre><code>git clone https://github.com/kenanwahbeh/ByteGuard.git
+cd ByteGuard
+python3 tools/build.py                  # writes dist/byteguard.sh
+sudo bash dist/byteguard.sh</code></pre>
+      <pre><code>python3 -m unittest discover -s tests   # unit tests, safe to run anywhere</code></pre>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <img src="assets/logo.png" alt="شعار Byte Balance Technology" width="220" loading="lazy">
+      <p>ByteGuard منشور بترخيص <a href="https://github.com/kenanwahbeh/ByteGuard/blob/main/LICENSE">MIT</a>. <a href="https://github.com/kenanwahbeh/ByteGuard">المصدر على GitHub</a> · <a href="https://github.com/kenanwahbeh/ByteGuard/releases">الإصدارات</a></p>
+      <p>WireGuard علامة تجارية مسجّلة لـ Jason A. Donenfeld، وByteGuard مشروع مستقل، غير تابع لمشروع WireGuard ولا معتمد منه.</p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,48 @@
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "assets/logo.png"
+      - "assets/screenshots/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Assemble the site with the images it uses
+        run: |
+          mkdir -p _site/assets/screenshots
+          cp -r site/. _site/
+          cp assets/logo.png _site/assets/
+          cp assets/screenshots/devices-ar.png assets/screenshots/devices-en.png assets/screenshots/web-en.png \
+            _site/assets/screenshots/
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
